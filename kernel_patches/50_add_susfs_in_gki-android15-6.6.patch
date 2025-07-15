@@ -102,7 +102,7 @@ index 1c46b79ea152..b4d80e1c2cde 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index caffe417b931..1a750f465421 100644
+index caffe417b931..ce387e74f880 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -41,10 +41,22 @@
@@ -429,7 +429,7 @@ index caffe417b931..1a750f465421 100644
  
  	error = filename_parentat(dfd, name, reval_flag, path, &last, &type);
  	if (error)
-@@ -3880,8 +4079,41 @@ static struct dentry *filename_create(int dfd, struct filename *name,
+@@ -3880,8 +4079,37 @@ static struct dentry *filename_create(int dfd, struct filename *name,
  	if (last.name[last.len] && !want_dir)
  		create_flags = 0;
  	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT);
@@ -440,10 +440,6 @@ index caffe417b931..1a750f465421 100644
 +		if (susfs_is_base_dentry_android_data_dir(base) &&
 +			susfs_is_sus_android_data_d_name_found(last.name))
 +		{
-+			if (create_flags) {
-+				dentry = ERR_PTR(-EACCES);
-+				goto unlock;
-+			}
 +			dentry = lookup_one_qstr_excl(&susfs_fake_qstr_name, base,
 +				      reval_flag | create_flags);
 +			goto skip_orig_flow;
@@ -471,7 +467,7 @@ index caffe417b931..1a750f465421 100644
  	if (IS_ERR(dentry))
  		goto unlock;
  
-@@ -4219,6 +4451,10 @@ int do_rmdir(int dfd, struct filename *name)
+@@ -4219,6 +4447,10 @@ int do_rmdir(int dfd, struct filename *name)
  	struct qstr last;
  	int type;
  	unsigned int lookup_flags = 0;
@@ -482,7 +478,7 @@ index caffe417b931..1a750f465421 100644
  retry:
  	error = filename_parentat(dfd, name, lookup_flags, &path, &last, &type);
  	if (error)
-@@ -4241,7 +4477,33 @@ int do_rmdir(int dfd, struct filename *name)
+@@ -4241,7 +4473,33 @@ int do_rmdir(int dfd, struct filename *name)
  		goto exit2;
  
  	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
@@ -516,7 +512,7 @@ index caffe417b931..1a750f465421 100644
  	error = PTR_ERR(dentry);
  	if (IS_ERR(dentry))
  		goto exit3;
-@@ -4360,6 +4622,10 @@ int do_unlinkat(int dfd, struct filename *name)
+@@ -4360,6 +4618,10 @@ int do_unlinkat(int dfd, struct filename *name)
  	struct inode *inode = NULL;
  	struct inode *delegated_inode = NULL;
  	unsigned int lookup_flags = 0;
@@ -527,7 +523,7 @@ index caffe417b931..1a750f465421 100644
  retry:
  	error = filename_parentat(dfd, name, lookup_flags, &path, &last, &type);
  	if (error)
-@@ -4374,7 +4640,33 @@ int do_unlinkat(int dfd, struct filename *name)
+@@ -4374,7 +4636,33 @@ int do_unlinkat(int dfd, struct filename *name)
  		goto exit2;
  retry_deleg:
  	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
@@ -561,7 +557,7 @@ index caffe417b931..1a750f465421 100644
  	error = PTR_ERR(dentry);
  	if (!IS_ERR(dentry)) {
  
-@@ -4921,6 +5213,10 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
+@@ -4921,6 +5209,10 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
  	unsigned int lookup_flags = 0, target_flags = LOOKUP_RENAME_TARGET;
  	bool should_retry = false;
  	int error = -EINVAL;
@@ -572,7 +568,7 @@ index caffe417b931..1a750f465421 100644
  
  	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
  		goto put_names;
-@@ -4962,9 +5258,35 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
+@@ -4962,9 +5254,35 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
  
  retry_deleg:
  	trap = lock_rename(new_path.dentry, old_path.dentry);
@@ -608,7 +604,7 @@ index caffe417b931..1a750f465421 100644
  	error = PTR_ERR(old_dentry);
  	if (IS_ERR(old_dentry))
  		goto exit3;
-@@ -4972,8 +5294,34 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
+@@ -4972,8 +5290,34 @@ int do_renameat2(int olddfd, struct filename *from, int newdfd,
  	error = -ENOENT;
  	if (d_is_negative(old_dentry))
  		goto exit4;
