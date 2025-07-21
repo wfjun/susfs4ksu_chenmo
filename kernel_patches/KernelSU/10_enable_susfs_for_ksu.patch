@@ -1,5 +1,5 @@
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index 67f177f4..63080d55 100644
+index 67f177f4..8d7065d0 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
 @@ -16,4 +16,139 @@ config KSU_DEBUG
@@ -17,7 +17,7 @@ index 67f177f4..63080d55 100644
 +
 +config KSU_SUSFS_HAS_MAGIC_MOUNT
 +    bool "Say yes if the current KernelSU repo has magic mount implemented (default y)"
-+    depends on KSU
++    depends on KSU_SUSFS
 +    default y
 +    help
 +      - Enable to indicate that the current SUSFS kernel supports the auto hide features for 5ec1cff's Magic Mount KernelSU
