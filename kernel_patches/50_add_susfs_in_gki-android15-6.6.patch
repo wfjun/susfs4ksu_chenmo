@@ -640,7 +640,7 @@ index caffe417b931..e458eae786c0 100644
  	if (IS_ERR(new_dentry))
  		goto exit4;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 08d502aae6f9..7b6cb9a56aae 100644
+index 08d502aae6f9..14ea2d96d200 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,38 @@
@@ -937,7 +937,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  {
  	struct mount *res, *p, *q, *r, *parent;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	bool is_current_zygote_domain = susfs_is_current_zygote_domain();
++	bool is_zygote_not_copy_mnt_ns = (susfs_is_current_zygote_domain() && !(flag & CL_COPY_MNT_NS));
 +#endif
  
  	if (!(flag & CL_COPY_UNBINDABLE) && IS_MNT_UNBINDABLE(mnt))
@@ -952,13 +952,12 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  		if (!is_subdir(r->mnt_mountpoint, dentry))
  			continue;
  
-@@ -2016,6 +2219,15 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
+@@ -2016,6 +2219,14 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
  			q = clone_mnt(p, p->mnt.mnt_root, flag);
  			if (IS_ERR(q))
  				goto out;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+			if (is_current_zygote_domain &&
-+				!(flag & CL_COPY_MNT_NS) &&
++			if (is_zygote_not_copy_mnt_ns &&
 +				q->mnt_id < DEFAULT_SUS_MNT_ID)
 +			{
 +				attach_mnt_count++;
@@ -968,7 +967,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  			lock_mount_hash();
  			list_add_tail(&q->mnt_list, &res->mnt_list);
  			attach_mnt(q, parent, p->mnt_mp, false);
-@@ -2641,6 +2853,27 @@ static int do_loopback(struct path *path, const char *old_name,
+@@ -2641,6 +2852,27 @@ static int do_loopback(struct path *path, const char *old_name,
  		umount_tree(mnt, UMOUNT_SYNC);
  		unlock_mount_hash();
  	}
@@ -996,7 +995,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  out2:
  	unlock_mount(mp);
  out:
-@@ -3774,6 +4007,10 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3774,6 +4006,10 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	struct mount *old;
  	struct mount *new;
  	int copy_flags;
@@ -1007,7 +1006,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  
  	BUG_ON(!ns);
  
-@@ -3793,6 +4030,11 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3793,6 +4029,11 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -1019,32 +1018,36 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -3835,6 +4077,24 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
- 		while (p->mnt.mnt_root != q->mnt.mnt_root)
- 			p = next_mnt(skip_mnt_tree(p), old);
- 	}
+@@ -3814,6 +4055,12 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+ 	 */
+ 	p = old;
+ 	q = new;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	// q->mnt.susfs_mnt_id_backup -> original mnt_id
-+	// q->mnt_id -> will be modified to the fake mnt_id
-+
-+	// Here We are only interested in processes of which original mnt namespace belongs to zygote 
-+	// Also we just make use of existing 'q' mount pointer, no need to delcare extra mount pointer
-+	if (is_zygote_pid) {
-+		last_entry_mnt_id = list_first_entry(&new_ns->list, struct mount, mnt_list)->mnt_id;
-+		list_for_each_entry(q, &new_ns->list, mnt_list) {
-+			if (unlikely(q->mnt_id >= DEFAULT_SUS_MNT_ID)) {
-+				continue;
-+			}
-+			q->mnt.susfs_mnt_id_backup = q->mnt_id;
-+			q->mnt_id = last_entry_mnt_id++;
-+		}
++	if (likely(is_zygote_pid)) {
++		last_entry_mnt_id = new->mnt_id;
++		q->mnt.susfs_mnt_id_backup = new->mnt_id;
 +	}
 +#endif
-+
- 	namespace_unlock();
- 
- 	if (rootmnt)
-@@ -3907,6 +4167,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+ 	while (p) {
+ 		q->mnt_ns = new_ns;
+ 		new_ns->mounts++;
+@@ -3831,6 +4078,15 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+ 		q = next_mnt(q, new);
+ 		if (!q)
+ 			break;
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++		// Here We are only interested in processes of which original mnt namespace belongs to zygote
++		if (likely(is_zygote_pid && (q->mnt_id < DEFAULT_SUS_MNT_ID))) {
++			// q->mnt.susfs_mnt_id_backup -> original mnt_id
++			// q->mnt_id -> to be modified to the fake mnt_id
++			q->mnt.susfs_mnt_id_backup = q->mnt_id;
++			q->mnt_id = ++last_entry_mnt_id;
++		}
++#endif
+ 		// an mntns binding we'd skipped?
+ 		while (p->mnt.mnt_root != q->mnt.mnt_root)
+ 			p = next_mnt(skip_mnt_tree(p), old);
+@@ -3907,6 +4163,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
  
  	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
  
@@ -1058,7 +1061,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  	kfree(options);
  out_data:
  	kfree(kernel_dev);
-@@ -4134,6 +4401,13 @@ SYSCALL_DEFINE5(move_mount,
+@@ -4134,6 +4397,13 @@ SYSCALL_DEFINE5(move_mount,
  	path_put(&to_path);
  out_from:
  	path_put(&from_path);
@@ -1072,7 +1075,7 @@ index 08d502aae6f9..7b6cb9a56aae 100644
  	return ret;
  }
  
-@@ -5048,3 +5322,37 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5048,3 +5318,37 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
