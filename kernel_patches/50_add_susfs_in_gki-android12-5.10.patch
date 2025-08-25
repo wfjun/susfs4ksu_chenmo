@@ -1,3 +1,4 @@
+
 diff --git a/fs/Makefile b/fs/Makefile
 index c7851875b668..bb53b87308d6 100644
 --- a/fs/Makefile
@@ -56,7 +57,7 @@ index 4f25015aa534..f1394c6915f1 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index 4edc932a7dce..4f2e7edc3fa6 100644
+index 4cbc211e9049..faa2ac3d8606 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -66,6 +66,10 @@
@@ -70,7 +71,7 @@ index 4edc932a7dce..4f2e7edc3fa6 100644
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
  
-@@ -1867,6 +1871,13 @@ static int bprm_execve(struct linux_binprm *bprm,
+@@ -1871,6 +1875,13 @@ static int bprm_execve(struct linux_binprm *bprm,
  	return retval;
  }
  
@@ -84,7 +85,7 @@ index 4edc932a7dce..4f2e7edc3fa6 100644
  static int do_execveat_common(int fd, struct filename *filename,
  			      struct user_arg_ptr argv,
  			      struct user_arg_ptr envp,
-@@ -1878,6 +1889,18 @@ static int do_execveat_common(int fd, struct filename *filename,
+@@ -1882,6 +1893,18 @@ static int do_execveat_common(int fd, struct filename *filename,
  	if (IS_ERR(filename))
  		return PTR_ERR(filename);
  
@@ -104,7 +105,7 @@ index 4edc932a7dce..4f2e7edc3fa6 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index 8cea84ecbf56..fc68e34bc925 100644
+index 177914858150..03f4c0094e79 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -39,6 +39,9 @@
@@ -539,7 +540,7 @@ index 8cea84ecbf56..fc68e34bc925 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 5d5a426aa495..2512cb3030e6 100644
+index dd9980f3fd9b..c5af7062a73b 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -30,10 +30,36 @@
@@ -829,7 +830,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  	lock_mount_hash();
  	list_add_tail(&mnt->mnt_instance, &sb->s_mounts);
  	unlock_mount_hash();
-@@ -1815,6 +2012,9 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
+@@ -1816,6 +2013,9 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
  					int flag)
  {
  	struct mount *res, *p, *q, *r, *parent;
@@ -839,7 +840,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  
  	if (!(flag & CL_COPY_UNBINDABLE) && IS_MNT_UNBINDABLE(mnt))
  		return ERR_PTR(-EINVAL);
-@@ -1831,6 +2031,9 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
+@@ -1832,6 +2032,9 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
  	p = mnt;
  	list_for_each_entry(r, &mnt->mnt_mounts, mnt_child) {
  		struct mount *s;
@@ -849,7 +850,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  		if (!is_subdir(r->mnt_mountpoint, dentry))
  			continue;
  
-@@ -1860,6 +2063,14 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
+@@ -1861,6 +2064,14 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
  			q = clone_mnt(p, p->mnt.mnt_root, flag);
  			if (IS_ERR(q))
  				goto out;
@@ -864,7 +865,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  			lock_mount_hash();
  			list_add_tail(&q->mnt_list, &res->mnt_list);
  			attach_mnt(q, parent, p->mnt_mp);
-@@ -2392,6 +2603,27 @@ static int do_loopback(struct path *path, const char *old_name,
+@@ -2393,6 +2604,27 @@ static int do_loopback(struct path *path, const char *old_name,
  		umount_tree(mnt, UMOUNT_SYNC);
  		unlock_mount_hash();
  	}
@@ -892,7 +893,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  out2:
  	unlock_mount(mp);
  out:
-@@ -3328,6 +3560,10 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3336,6 +3568,10 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	struct mount *old;
  	struct mount *new;
  	int copy_flags;
@@ -903,7 +904,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  
  	BUG_ON(!ns);
  
-@@ -3347,6 +3583,11 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3355,6 +3591,11 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -915,7 +916,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -3368,6 +3609,12 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3376,6 +3617,12 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	 */
  	p = old;
  	q = new;
@@ -928,7 +929,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  	while (p) {
  		q->mnt_ns = new_ns;
  		new_ns->mounts++;
-@@ -3385,6 +3632,15 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3393,6 +3640,15 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  		q = next_mnt(q, new);
  		if (!q)
  			break;
@@ -944,7 +945,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  		while (p->mnt.mnt_root != q->mnt.mnt_root)
  			p = next_mnt(p, old);
  	}
-@@ -3460,6 +3716,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+@@ -3468,6 +3724,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
  
  	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
  
@@ -958,7 +959,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  	kfree(options);
  out_data:
  	kfree(kernel_dev);
-@@ -3664,6 +3927,13 @@ SYSCALL_DEFINE5(move_mount,
+@@ -3672,6 +3935,13 @@ SYSCALL_DEFINE5(move_mount,
  	path_put(&to_path);
  out_from:
  	path_put(&from_path);
@@ -972,7 +973,7 @@ index 5d5a426aa495..2512cb3030e6 100644
  	return ret;
  }
  
-@@ -4140,3 +4410,37 @@ const struct proc_ns_operations mntns_operations = {
+@@ -4148,3 +4418,37 @@ const struct proc_ns_operations mntns_operations = {
  	.install	= mntns_install,
  	.owner		= mntns_owner,
  };
@@ -1102,7 +1103,7 @@ index 765b50aeadd2..22a40c6d7842 100644
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/open.c b/fs/open.c
-index 965230a0710c..4c28a41e5310 100644
+index ee284a93010d..1cc873c2e9ef 100644
 --- a/fs/open.c
 +++ b/fs/open.c
 @@ -32,6 +32,9 @@
@@ -1246,7 +1247,7 @@ index 6b634c0a9b6e..3a181231470c 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index d92d1ee75930..6e99ee2ab675 100644
+index f96a51999489..3e2f2c9c2851 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -20,6 +20,9 @@
@@ -2011,7 +2012,7 @@ index 1de01fab5788..bd2220acc6f5 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index e1efe744c6a5..0a24eb90bd1f 100644
+index 7804256b7539..cc6e8630cd31 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -47,6 +47,12 @@
