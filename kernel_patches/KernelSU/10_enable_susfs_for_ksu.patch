@@ -1,8 +1,8 @@
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index 67f177f4..e4365900 100644
+index 67f177f4..e6172171 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -16,4 +16,139 @@ config KSU_DEBUG
+@@ -16,4 +16,131 @@ config KSU_DEBUG
  	help
  	  Enable KernelSU debug mode.
  
@@ -14,14 +14,6 @@ index 67f177f4..e4365900 100644
 +    default y
 +    help
 +      Patch and Enable SUSFS to kernel with KernelSU.
-+
-+config KSU_SUSFS_HAS_MAGIC_MOUNT
-+    bool "Say yes if the current KernelSU repo has magic mount implemented (default y)"
-+    depends on KSU_SUSFS
-+    default y
-+    help
-+      - Enable to indicate that the current SUSFS kernel supports the auto hide features for 5ec1cff's Magic Mount KernelSU
-+      - Every mounts from /debug_ramdisk/workdir will be treated as magic mount and processed differently by susfs
 +
 +config KSU_SUSFS_SUS_PATH
 +    bool "Enable to hide suspicious path (NOT recommended)"
@@ -143,7 +135,7 @@ index 67f177f4..e4365900 100644
 +
  endmenu
 diff --git a/kernel/Makefile b/kernel/Makefile
-index 732ba2d9..09fed4c8 100644
+index 9fec3ef3..8a190993 100644
 --- a/kernel/Makefile
 +++ b/kernel/Makefile
 @@ -51,4 +51,81 @@ ccflags-y += -DEXPECTED_HASH=\"$(KSU_EXPECTED_HASH)\"
@@ -1212,7 +1204,7 @@ index 88f1e7d3..22d4b324 100644
  
  #endif
 diff --git a/kernel/sucompat.c b/kernel/sucompat.c
-index e1efb073..f2ae5a47 100644
+index ae57becc..8ab08a3f 100644
 --- a/kernel/sucompat.c
 +++ b/kernel/sucompat.c
 @@ -9,6 +9,9 @@
@@ -1370,7 +1362,7 @@ index e1efb073..f2ae5a47 100644
  	ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
  
  	if (likely(memcmp(path, su, sizeof(su))))
-@@ -249,3 +284,41 @@ void ksu_sucompat_exit()
+@@ -285,3 +320,41 @@ void ksu_sucompat_exit()
  	}
  #endif
  }
