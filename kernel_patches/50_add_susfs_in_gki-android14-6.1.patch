@@ -515,10 +515,10 @@ index 1fa36df7b667..e997ba39c615 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5044..554fd7dae9bc 100644
+index 67d89ebb5044..364aa73f28e3 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -32,10 +32,37 @@
+@@ -32,10 +32,35 @@
  #include <linux/fs_context.h>
  #include <linux/shmem_fs.h>
  #include <linux/mnt_idmapping.h>
@@ -536,8 +536,6 @@ index 67d89ebb5044..554fd7dae9bc 100644
 +
 +static DEFINE_IDA(susfs_ksu_mnt_id_ida);
 +static DEFINE_IDA(susfs_ksu_mnt_group_ida);
-+
-+#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
 +#endif
 +
 +#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
@@ -556,7 +554,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  /* Maximum number of mounts in a mount namespace */
  static unsigned int sysctl_mount_max __read_mostly = 100000;
  
-@@ -123,6 +150,19 @@ static inline struct hlist_head *mp_hash(struct dentry *dentry)
+@@ -123,6 +148,19 @@ static inline struct hlist_head *mp_hash(struct dentry *dentry)
  	return &mountpoint_hashtable[tmp & mp_hash_mask];
  }
  
@@ -576,34 +574,27 @@ index 67d89ebb5044..554fd7dae9bc 100644
  static int mnt_alloc_id(struct mount *mnt)
  {
  	int res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
-@@ -135,6 +175,26 @@ static int mnt_alloc_id(struct mount *mnt)
+@@ -135,6 +173,19 @@ static int mnt_alloc_id(struct mount *mnt)
  
  static void mnt_free_id(struct mount *mnt)
  {
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	// First we have to check if susfs_mnt_id_backup is >= DEFAULT_KSU_MNT_ID,
-+	// if so, no need to free.
-+	if (unlikely(mnt->mnt.susfs_mnt_id_backup >= DEFAULT_KSU_MNT_ID)) {
-+		return;
-+	}
-+
-+	// Second if susfs_mnt_id_backup was set after mnt_id reorder, free it if so.
-+	if (likely(mnt->mnt.susfs_mnt_id_backup)) {
++	/* - We should keep checking mnt->mnt.susfs_mnt_id_backup if it was set.
++	 * - Then check if mnt->mnt_id is >= DEFAULT_KSU_MNT_ID.
++	 */   
++	if (mnt->mnt.susfs_mnt_id_backup) {
 +		ida_free(&mnt_id_ida, mnt->mnt.susfs_mnt_id_backup);
 +		return;
 +	}
-+
-+	// Lastly check if ksu mounts are umounted globally
-+	if (unlikely(mnt->mnt_id >= DEFAULT_KSU_MNT_ID)) {
++	if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID) {
 +		ida_free(&susfs_ksu_mnt_id_ida, mnt->mnt_id);
 +		return;
 +	}
-+
 +#endif
  	ida_free(&mnt_id_ida, mnt->mnt_id);
  }
  
-@@ -143,7 +203,23 @@ static void mnt_free_id(struct mount *mnt)
+@@ -143,7 +194,23 @@ static void mnt_free_id(struct mount *mnt)
   */
  static int mnt_alloc_group_id(struct mount *mnt)
  {
@@ -627,7 +618,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  
  	if (res < 0)
  		return res;
-@@ -156,6 +232,22 @@ static int mnt_alloc_group_id(struct mount *mnt)
+@@ -156,6 +223,22 @@ static int mnt_alloc_group_id(struct mount *mnt)
   */
  void mnt_release_group_id(struct mount *mnt)
  {
@@ -650,7 +641,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  	ida_free(&mnt_group_ida, mnt->mnt_group_id);
  	mnt->mnt_group_id = 0;
  }
-@@ -193,6 +285,65 @@ int mnt_get_count(struct mount *mnt)
+@@ -193,6 +276,65 @@ int mnt_get_count(struct mount *mnt)
  #endif
  }
  
@@ -716,7 +707,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  static struct mount *alloc_vfsmnt(const char *name)
  {
  	struct mount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
-@@ -220,6 +371,10 @@ static struct mount *alloc_vfsmnt(const char *name)
+@@ -220,6 +362,10 @@ static struct mount *alloc_vfsmnt(const char *name)
  		mnt->mnt_count = 1;
  		mnt->mnt_writers = 0;
  #endif
@@ -727,7 +718,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  
  		INIT_HLIST_NODE(&mnt->mnt_hash);
  		INIT_LIST_HEAD(&mnt->mnt_child);
-@@ -1010,7 +1165,24 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1010,7 +1156,22 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -736,8 +727,6 @@ index 67d89ebb5044..554fd7dae9bc 100644
 +	if (susfs_is_boot_completed_triggered) {
 +		goto orig_flow;
 +	}
-+
-+	// We only check for ksu process
 +	if (susfs_is_current_ksu_domain()) {
 +		mnt = susfs_alloc_sus_vfsmnt(fc->source ?: "none");
 +		goto bypass_orig_flow;
@@ -752,75 +741,22 @@ index 67d89ebb5044..554fd7dae9bc 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1096,8 +1268,75 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
- 	struct super_block *sb = old->mnt.mnt_sb;
+@@ -1097,7 +1258,22 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct mount *mnt;
  	int err;
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	char *src_path = NULL, *path_ptr = NULL;
-+
 +	// We won't check it anymore if boot-completed stage is triggered.
 +	if (susfs_is_boot_completed_triggered) {
 +		goto orig_flow;
 +	}
-+
-+	// First we must check for ksu process because of magic mount
-+	if (susfs_is_current_ksu_domain()) {
-+		// if it is unsharing, we reuse the old->mnt_id
-+		if (flag & CL_COPY_MNT_NS) {
-+			mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
-+			ida_free(&susfs_ksu_mnt_id_ida, mnt->mnt_id);
-+			mnt->mnt_id = old->mnt_id;
-+			mnt->mnt.susfs_mnt_id_backup = DEFAULT_KSU_MNT_ID;
-+			goto bypass_orig_flow;
-+		}
-+		// else we just go assign fake mnt_id
++	if (old->mnt_id >= DEFAULT_KSU_MNT_ID || old->mnt_parent->mnt_id >= DEFAULT_KSU_MNT_ID) {
 +		mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
 +		goto bypass_orig_flow;
 +	}
-+
-+	// Second we check for zygote process, same due to magic mount
-+	if (susfs_is_current_zygote_domain()) {
-+		// We quickly check if the mount dev name is KSU first, go assign fake mnt_id if so
-+		if (!strcmp(old->mnt_devname, "KSU")) {
-+			mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
-+			goto bypass_orig_flow;
-+		}
-+		// Next we need to retrieve the source mount path
-+		src_path = kmalloc(PATH_MAX, GFP_KERNEL);
-+		if (!src_path) {
-+			goto orig_flow;
-+		}
-+		path_ptr = dentry_path_raw(old->mnt.mnt_root, src_path, PATH_MAX);
-+		if (IS_ERR(path_ptr)) {
-+			kfree(src_path);
-+			goto orig_flow;
-+		}
-+		// If old mount has shared peer group 1 and source mountpoint is not "/", go assign fake mnt_id
-+		if (old->mnt_group_id == 1 && strcmp(path_ptr, "/")) {
-+			mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
-+			kfree(src_path);
-+			goto bypass_orig_flow;
-+		}
-+		// If source mount path begins with "/adb/", go assign fake mnt_id
-+		if (!strncmp(path_ptr, "/adb/", 5)) {
-+			mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
-+			kfree(src_path);
-+			goto bypass_orig_flow;
-+		}
-+		kfree(src_path);
-+		goto orig_flow;
-+	}
-+
-+	// Lastly for other processes of which old->mnt_id is >= DEFAULT_KSU_MNT_ID, go assign fake mnt_id
-+	if (old->mnt_id >= DEFAULT_KSU_MNT_ID) {
-+		mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
-+		goto bypass_orig_flow;
-+	}
-+
 +orig_flow:
 +#endif
- 
++
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -828,7 +764,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -2457,6 +2696,27 @@ static int do_loopback(struct path *path, const char *old_name,
+@@ -2457,6 +2633,27 @@ static int do_loopback(struct path *path, const char *old_name,
  		umount_tree(mnt, UMOUNT_SYNC);
  		unlock_mount_hash();
  	}
@@ -856,17 +792,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  out2:
  	unlock_mount(mp);
  out:
-@@ -3495,6 +3755,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
- 	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
- 	if (user_ns != ns->user_ns)
- 		copy_flags |= CL_SHARED_TO_SLAVE;
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	copy_flags |= CL_COPY_MNT_NS;
-+#endif
- 	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
- 	if (IS_ERR(new)) {
- 		namespace_unlock();
-@@ -3608,6 +3871,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+@@ -3608,6 +3805,13 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
  
  	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
  
@@ -880,7 +806,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  	kfree(options);
  out_data:
  	kfree(kernel_dev);
-@@ -3830,6 +4100,13 @@ SYSCALL_DEFINE5(move_mount,
+@@ -3830,6 +4034,13 @@ SYSCALL_DEFINE5(move_mount,
  	path_put(&to_path);
  out_from:
  	path_put(&from_path);
@@ -894,7 +820,7 @@ index 67d89ebb5044..554fd7dae9bc 100644
  	return ret;
  }
  
-@@ -4742,3 +5019,37 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -4742,3 +4953,37 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
