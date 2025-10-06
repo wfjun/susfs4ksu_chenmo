@@ -27,6 +27,12 @@ jobs:
     uses: ./.github/workflows/gki-android14-6.1.yml
     secrets: inherit
 
+  run_gkiandroid1461_dev:
+    permissions: write-all
+    needs: check
+    uses: ./.github/workflows/gki-android14-6.1-dev.yml
+    secrets: inherit
+
   run_gkiandroid1566:
     permissions: write-all
     needs: check
@@ -37,6 +43,12 @@ jobs:
     permissions: write-all
     needs: check
     uses: ./.github/workflows/gki-android13-5.15.yml
+    secrets: inherit
+
+  run_gkiandroid13515_dev:
+    permissions: write-all
+    needs: check
+    uses: ./.github/workflows/gki-android13-5.15-dev.yml
     secrets: inherit
 
   run_gkiandroid12510:
