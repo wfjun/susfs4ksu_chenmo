@@ -909,10 +909,12 @@ void susfs_auto_add_try_umount_for_bind_mount(struct path *path) {
 			new_pathname_len = strlen(dpath) - 22;
 			memmove(dpath, dpath+22, new_pathname_len);
 			*(dpath + new_pathname_len) = '\0';
+			goto add_to_new_list;
 		}
 		goto out_free_pathname;
 	}
 
+add_to_new_list:
 	new_list = kmalloc(sizeof(struct st_susfs_try_umount_list), GFP_KERNEL);
 	if (!new_list) {
 		SUSFS_LOGE("no enough memory\n");
