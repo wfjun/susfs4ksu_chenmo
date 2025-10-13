@@ -641,7 +641,7 @@ index 5f45d9b2f84d..7bbc0b94067f 100644
  	if (IS_ERR(new_dentry))
  		goto exit4;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 2d0231797d0d..d36c8e7639ec 100644
+index 2d0231797d0d..7013065465d9 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,38 @@
@@ -875,23 +875,16 @@ index 2d0231797d0d..d36c8e7639ec 100644
  
  		INIT_HLIST_NODE(&mnt->mnt_hash);
  		INIT_LIST_HEAD(&mnt->mnt_child);
-@@ -1085,7 +1267,25 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1085,7 +1267,18 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	// - We do not check anymore if boot-completed stage is triggered
-+	//   just to stop the performance loss
-+	if (susfs_is_boot_completed_triggered) {
-+		goto orig_flow;
-+	}
-+
-+	// We only check for ksu process
++	// We keep checking for ksu process
 +	if (susfs_is_current_ksu_domain()) {
 +		mnt = susfs_alloc_sus_vfsmnt(fc->source ?: "none");
 +		goto bypass_orig_flow;
 +	}
-+orig_flow:
 +#endif
 +
  	mnt = alloc_vfsmnt(fc->source ?: "none");
@@ -901,15 +894,15 @@ index 2d0231797d0d..d36c8e7639ec 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1168,7 +1368,38 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1168,7 +1361,37 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct mount *mnt;
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	// - We do not check anymore if boot-completed stage is triggered
++	// - We do not check anymore for ksu process if boot-completed stage is triggered
 +	//   just to stop the performance loss
 +	if (susfs_is_boot_completed_triggered) {
-+		goto orig_flow;
++		goto skip_checking_for_ksu_proc;
 +	}
 +
 +	// First we must check for ksu process because of magic mount
@@ -924,13 +917,12 @@ index 2d0231797d0d..d36c8e7639ec 100644
 +		goto bypass_orig_flow;
 +	}
 +
++skip_checking_for_ksu_proc:
 +	// Lastly for other processes of which old->mnt_id == DEFAULT_KSU_MNT_ID, go assign fake mnt_id
 +	if (old->mnt_id == DEFAULT_KSU_MNT_ID) {
 +		mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
 +		goto bypass_orig_flow;
 +	}
-+
-+orig_flow:
 +#endif
 +
  	mnt = alloc_vfsmnt(old->mnt_devname);
@@ -940,22 +932,17 @@ index 2d0231797d0d..d36c8e7639ec 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -2646,6 +2877,31 @@ static int do_loopback(struct path *path, const char *old_name,
+@@ -2646,6 +2869,23 @@ static int do_loopback(struct path *path, const char *old_name,
  		umount_tree(mnt, UMOUNT_SYNC);
  		unlock_mount_hash();
  	}
 +#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT) || defined(CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT)
-+	// - We do not check anymore if boot-completed stage is triggered
-+	//   just to stop the performance loss
 +	// - Check if bind mounted path should be hidden and umounted automatically.
 +	// And we target only process with ksu domain.
-+	if (!susfs_is_boot_completed_triggered &&
-+		(susfs_is_current_ksu_domain() || !strcmp(mnt->mnt_devname, "KSU")))
-+	{
++	if (susfs_is_current_ksu_domain()) {
 +#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT)
-+		if (susfs_is_auto_add_sus_bind_mount_enabled &&
-+				susfs_auto_add_sus_bind_mount(old_name, &old_path)) {
-+			goto orig_flow;
++		if (susfs_is_auto_add_sus_bind_mount_enabled) {
++			susfs_auto_add_sus_bind_mount(old_name, &old_path);
 +		}
 +#endif
 +#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT)
@@ -964,15 +951,12 @@ index 2d0231797d0d..d36c8e7639ec 100644
 +		}
 +#endif
 +	}
-+#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT)
-+orig_flow:
-+#endif
 +#endif // #if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT) || defined(CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT)
 +
  out2:
  	unlock_mount(mp);
  out:
-@@ -3805,6 +4061,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3805,6 +4045,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -982,7 +966,7 @@ index 2d0231797d0d..d36c8e7639ec 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -3919,6 +4178,15 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+@@ -3919,6 +4162,15 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
  
  	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
  
@@ -998,7 +982,7 @@ index 2d0231797d0d..d36c8e7639ec 100644
  	kfree(options);
  out_data:
  	kfree(kernel_dev);
-@@ -4146,6 +4414,15 @@ SYSCALL_DEFINE5(move_mount,
+@@ -4146,6 +4398,15 @@ SYSCALL_DEFINE5(move_mount,
  	path_put(&to_path);
  out_from:
  	path_put(&from_path);
@@ -1014,7 +998,7 @@ index 2d0231797d0d..d36c8e7639ec 100644
  	return ret;
  }
  
-@@ -5060,3 +5337,38 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5060,3 +5321,42 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -1033,6 +1017,10 @@ index 2d0231797d0d..d36c8e7639ec 100644
 +	get_mnt_ns(mnt_ns);
 +	first_mnt_id = list_first_entry(&mnt_ns->list, struct mount, mnt_list)->mnt_id;
 +	list_for_each_entry(mnt, &mnt_ns->list, mnt_list) {
++		// It is very important that we don't reorder the sus mount if it is not umounted
++		if (mnt->mnt_id == DEFAULT_KSU_MNT_ID) {
++			continue;
++		}
 +		mnt->mnt.susfs_mnt_id_backup = mnt->mnt_id;
 +		mnt->mnt_id = first_mnt_id++;
 +	}
