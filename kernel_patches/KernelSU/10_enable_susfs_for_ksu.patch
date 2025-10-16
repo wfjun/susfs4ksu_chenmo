@@ -288,7 +288,7 @@ index ba8b73f2..6ae5e3b9 100644
  }
 \ No newline at end of file
 diff --git a/kernel/core_hook.c b/kernel/core_hook.c
-index a63d34a7..eb5afc42 100644
+index a63d34a7..674ff894 100644
 --- a/kernel/core_hook.c
 +++ b/kernel/core_hook.c
 @@ -33,6 +33,10 @@
@@ -433,7 +433,7 @@ index a63d34a7..eb5afc42 100644
  			}
  			break;
  		}
-@@ -425,6 +522,408 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
+@@ -425,6 +522,392 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
  		return 0;
  	}
  
@@ -808,22 +808,6 @@ index a63d34a7..eb5afc42 100644
 +					pr_info("susfs: copy_to_user() failed\n");
 +			return 0;
 +		}
-+		if (arg2 == CMD_SUSFS_ADD_SUS_MAP_LOOP) {
-+			int error = 0;
-+			if (!ksu_access_ok((void __user*)arg3, sizeof(struct st_susfs_sus_map))) {
-+					pr_err("susfs: CMD_SUSFS_ADD_SUS_MAP_LOOP -> arg3 is not accessible\n");
-+					return 0;
-+			}
-+			if (!ksu_access_ok((void __user*)arg5, sizeof(error))) {
-+					pr_err("susfs: CMD_SUSFS_ADD_SUS_MAP_LOOP -> arg5 is not accessible\n");
-+					return 0;
-+			}
-+			error = susfs_add_sus_map_loop((struct st_susfs_sus_map __user*)arg3);
-+			pr_info("susfs: CMD_SUSFS_ADD_SUS_MAP_LOOP -> ret: %d\n", error);
-+			if (copy_to_user((void __user*)arg5, &error, sizeof(error)))
-+					pr_info("susfs: copy_to_user() failed\n");
-+			return 0;
-+		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		if (arg2 == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
 +			int error = 0;
@@ -842,7 +826,7 @@ index a63d34a7..eb5afc42 100644
  	// all other cmds are for 'root manager'
  	if (!from_manager) {
  		return 0;
-@@ -490,6 +989,12 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
+@@ -490,6 +973,12 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
  		}
  
  		if (enabled) {
@@ -855,7 +839,7 @@ index a63d34a7..eb5afc42 100644
  			ksu_sucompat_init();
  		} else {
  			ksu_sucompat_exit();
-@@ -528,11 +1033,15 @@ static bool should_umount(struct path *path)
+@@ -528,11 +1017,15 @@ static bool should_umount(struct path *path)
  		return false;
  	}
  
@@ -871,7 +855,7 @@ index a63d34a7..eb5afc42 100644
  }
  
  static void ksu_umount_mnt(struct path *path, int flags)
-@@ -543,7 +1052,11 @@ static void ksu_umount_mnt(struct path *path, int flags)
+@@ -543,7 +1036,11 @@ static void ksu_umount_mnt(struct path *path, int flags)
  	}
  }
  
@@ -883,7 +867,7 @@ index a63d34a7..eb5afc42 100644
  {
  	struct path path;
  	int err = kern_path(mnt, 0, &path);
-@@ -563,9 +1076,124 @@ static void try_umount(const char *mnt, bool check_mnt, int flags)
+@@ -563,9 +1060,118 @@ static void try_umount(const char *mnt, bool check_mnt, int flags)
  		return;
  	}
  
@@ -965,12 +949,6 @@ index a63d34a7..eb5afc42 100644
 +	return 0;
 +
 +do_umount:
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+	// - We exec susfs_run_sus_map_loop() before umounting any sus mounts 
-+	//   since we want the path inherited from zygote's namespace.
-+	susfs_run_sus_map_loop(new_uid.val);
-+#endif
-+
 +#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +	// susfs come first, and lastly umount by ksu, make sure umount in reversed order
 +	susfs_try_umount_all(new_uid.val);
@@ -1008,7 +986,7 @@ index a63d34a7..eb5afc42 100644
  int ksu_handle_setuid(struct cred *new, const struct cred *old)
  {
  	// this hook is used for umounting overlayfs for some uid, if there isn't any module mounted, just ignore it!
-@@ -632,6 +1260,7 @@ int ksu_handle_setuid(struct cred *new, const struct cred *old)
+@@ -632,6 +1238,7 @@ int ksu_handle_setuid(struct cred *new, const struct cred *old)
  
  	return 0;
  }

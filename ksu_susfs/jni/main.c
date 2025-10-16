@@ -43,7 +43,6 @@
 #define CMD_SUSFS_SUS_SU 0x60000
 #define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING 0x60010
 #define CMD_SUSFS_ADD_SUS_MAP 0x60020
-#define CMD_SUSFS_ADD_SUS_MAP_LOOP 0x60021
 
 #define SUSFS_MAX_LEN_PATHNAME 256
 #define SUSFS_MAX_LEN_MOUNT_TYPE_NAME 32
@@ -328,9 +327,6 @@ static void print_help(void) {
 	log("      - It does NOT support hiding for anon memory.\n");
 	log("      - It does NOT hide any inline hooks or plt hooks cause by the injected library itself\n");
 	log("      - It may not be able to evade detections by apps that implement a good injection detection\n");
-	log("\n");
-	log("    add_sus_map_loop </path/to/actual/library>\n");
-	log("      |--> Same as add_sus_map, the only difference is it will flag all added path as SUS_MAP on each zygote spawned umounted process, try using this if add_sus_map is not working when module like mountify is enabled\n");
 	log("\n");
 	log("    enable_avc_log_spoofing <0|1>\n");
 	log("      |--> 0: Disable spoofing the sus 'su' tcontext shown in avc log in kernel\n");
@@ -806,14 +802,6 @@ int main(int argc, char *argv[]) {
 		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_SUS_MAP, &info, NULL, &error);
 		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_SUS_MAP);
-		return error;
-	// add_sus_map_loop
-	} else if (argc == 3 && !strcmp(argv[1], "add_sus_map_loop")) {
-		struct st_susfs_sus_map info = {0};
-
-		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
-		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_SUS_MAP_LOOP, &info, NULL, &error);
-		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_SUS_MAP_LOOP);
 		return error;
 	// enable_avc_log_spoofing
 	} else if (argc == 3 && !strcmp(argv[1], "enable_avc_log_spoofing")) {
