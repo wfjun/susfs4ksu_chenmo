@@ -1082,7 +1082,7 @@ index ee284a93010d..638a64591bce 100644
  		return -EINVAL;
  
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index d0884f38c0db..5a70b8dc79ff 100644
+index d0884f38c0db..ccd797116745 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -99,6 +99,9 @@
@@ -1105,7 +1105,7 @@ index d0884f38c0db..5a70b8dc79ff 100644
  
  	if (!mm)
  		return 0;
-@@ -917,6 +923,21 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
+@@ -917,6 +923,22 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
  
  	while (count > 0) {
  		size_t this_len = min_t(size_t, count, PAGE_SIZE);
@@ -1119,6 +1119,7 @@ index d0884f38c0db..5a70b8dc79ff 100644
 +				} else {
 +					copied = -EIO;
 +				}
++				*ppos = addr;
 +				mmput(mm);
 +				goto free;
 +			}
@@ -1127,7 +1128,7 @@ index d0884f38c0db..5a70b8dc79ff 100644
  
  		if (write && copy_from_user(page, buf, this_len)) {
  			copied = -EFAULT;
-@@ -2446,6 +2467,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
+@@ -2446,6 +2468,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
  	for (vma = mm->mmap, pos = 2; vma; vma = vma->vm_next) {
  		if (!vma->vm_file)
  			continue;
@@ -1240,7 +1241,7 @@ index 6b634c0a9b6e..7f1d2ddae326 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index f96a51999489..d9f19a8d8828 100644
+index f96a51999489..7debcfdba769 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -20,6 +20,9 @@
@@ -1264,17 +1265,15 @@ index f96a51999489..d9f19a8d8828 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -332,8 +339,37 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -332,8 +339,35 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  
  	if (file) {
  		struct inode *inode = file_inode(vma->vm_file);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		if (unlikely(inode->i_mapping->flags & BIT_SUS_MAPS) && susfs_is_current_proc_umounted()) {
-+			start = vma->vm_start;
-+			end = vma->vm_end;
 +			seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
-+			seq_put_hex_ll(m, NULL, start, 8);
-+			seq_put_hex_ll(m, "-", end, 8);
++			seq_put_hex_ll(m, NULL, vma->vm_start, 8);
++			seq_put_hex_ll(m, "-", vma->vm_end, 8);
 +			seq_putc(m, ' ');
 +			seq_putc(m, '-');
 +			seq_putc(m, '-');
@@ -1302,7 +1301,7 @@ index f96a51999489..d9f19a8d8828 100644
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
  	}
  
-@@ -904,6 +940,26 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -904,6 +938,26 @@ static int show_smap(struct seq_file *m, void *v)
  	if (!vma_pages(vma))
  		goto show_pad;
  
@@ -1329,7 +1328,7 @@ index f96a51999489..d9f19a8d8828 100644
  	smap_gather_stats(vma, &mss, 0);
  
  	show_map_vma(m, vma);
-@@ -961,7 +1017,19 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -961,7 +1015,19 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  	hold_task_mempolicy(priv);
  
  	for (vma = priv->mm->mmap; vma;) {
@@ -1349,7 +1348,7 @@ index f96a51999489..d9f19a8d8828 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1688,6 +1756,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1688,6 +1754,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	unsigned long start_vaddr;
  	unsigned long end_vaddr;
  	int ret = 0, copied = 0;
@@ -1359,7 +1358,7 @@ index f96a51999489..d9f19a8d8828 100644
  
  	if (!mm || !mmget_not_zero(mm))
  		goto out;
-@@ -1744,6 +1815,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1744,6 +1813,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  			goto out_free;
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
  		mmap_read_unlock(mm);
