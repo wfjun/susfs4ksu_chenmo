@@ -62,9 +62,9 @@ EOF
 
 cat <<EOF >/dev/null
 ## Hide some zygisk modules ##
-ksu_susfs add_sus_path /data/adb/modules/my_module/zygisk/arm64-v8a.so
+ksu_susfs add_sus_map /data/adb/modules/my_module/zygisk/arm64-v8a.so
 
 ## Hide some map traces caused by some font module ##
-ksu_susfs add_sus_path /system/fonts/Roboto-Regular.ttf
-ksu_susfs add_sus_path /system/fonts/RobotoStatic-Regular.ttf
+ksu_susfs add_sus_map /system/fonts/Roboto-Regular.ttf
+ksu_susfs add_sus_map /system/fonts/RobotoStatic-Regular.ttf
 EOF
