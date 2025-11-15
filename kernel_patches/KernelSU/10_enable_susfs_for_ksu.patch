@@ -1052,7 +1052,7 @@ index 431e0441..d459ebf4 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 016ac058..6164a2e8 100644
+index 016ac058..a142726d 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -27,6 +27,9 @@
@@ -1199,17 +1199,17 @@ index 016ac058..6164a2e8 100644
 +    return 0;
 +
 +do_umount:
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +    if (!ksu_kernel_umount_enabled || !ksu_module_mounted) {
 +        goto skip_try_umount;
 +        
 +    }
 +
++#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +    pr_info("susfs: running susfs_try_umount_all() for uid: %u\n", new_uid);
 +    susfs_try_umount_all();
++#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +
 +skip_try_umount:
-+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +
 +    get_task_struct(current);
 +
