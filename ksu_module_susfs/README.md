@@ -1,6 +1,6 @@
 ## A KernelSU module for SUS-FS patched kernel ##
 
-This module is used for installing a userspace helper tool called **ksu_susfs** and **sus_su** into /data/adb/ and provides a script example to communicate with SUSFS kernel
+This module is used for installing a userspace helper tool called **ksu_susfs** into /data/adb/ and provides a script example to communicate with SUSFS kernel
 
 - To enable umount for zygote spawned system process on boot, create a new file to `/data/adb/susfs_umount_for_zygote_system_process` and reboot.
 
