@@ -670,7 +670,7 @@ index 5f45d9b2f84d..7bbc0b94067f 100644
  	if (IS_ERR(new_dentry))
  		goto exit4;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 2d0231797d0d..9043961f18e7 100644
+index 2d0231797d0d..d93c00a9e96b 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,38 @@
@@ -910,7 +910,7 @@ index 2d0231797d0d..9043961f18e7 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	// We keep checking for ksu process
-+	if (susfs_is_current_ksu_domain()) {
++	if (!susfs_is_boot_completed_triggered && susfs_is_current_ksu_domain()) {
 +		mnt = susfs_alloc_sus_vfsmnt(fc->source ?: "none");
 +		goto bypass_orig_flow;
 +	}
@@ -968,7 +968,7 @@ index 2d0231797d0d..9043961f18e7 100644
 +#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT) || defined(CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT)
 +	// - Check if bind mounted path should be hidden and umounted automatically.
 +	// And we target only process with ksu domain.
-+	if (susfs_is_current_ksu_domain()) {
++	if (!susfs_is_boot_completed_triggered && susfs_is_current_ksu_domain()) {
 +#if defined(CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT)
 +		if (susfs_is_auto_add_sus_bind_mount_enabled) {
 +			susfs_auto_add_sus_bind_mount(old_name, &old_path);
@@ -1027,7 +1027,7 @@ index 2d0231797d0d..9043961f18e7 100644
  	return ret;
  }
  
-@@ -5060,3 +5321,42 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5060,3 +5321,53 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -1054,6 +1054,17 @@ index 2d0231797d0d..9043961f18e7 100644
 +		WRITE_ONCE(mnt->mnt_id, first_mnt_id++);
 +	}
 +	put_mnt_ns(mnt_ns);
++}
++
++void susfs_assign_fake_mnt_id(struct mount *mnt) {
++	lock_mount_hash();
++
++	ida_free(&mnt_id_ida, mnt->mnt_id);
++
++	mnt->mnt_id = DEFAULT_KSU_MNT_ID;
++	mnt->mnt_group_id = ida_alloc_min(&susfs_ksu_mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID, GFP_KERNEL);
++
++	unlock_mount_hash();
 +}
 +#endif
 +#ifdef CONFIG_KSU_SUSFS
