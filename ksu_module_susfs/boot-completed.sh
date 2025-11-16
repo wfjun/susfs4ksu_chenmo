@@ -44,6 +44,7 @@ EOF
 
 
 #### Hide the mmapped real file from various maps in /proc/self/ ####
+cat <<EOF >/dev/null
 ## - Please note that it is better to do it in boot-completed starge
 ##   Since some target path may be mounted by ksu, and make sure the
 ##   target path has the same dev number as the one in global mnt ns,
@@ -60,11 +61,10 @@ EOF
 ##      from step 2 belongs to, and add the path from that mnt ns:
 ##         busybox nsenter -t <pid_of_mnt_ns_the_target_dev_number_belongs_to> -m ksu_susfs add_sus_map <target_path>
 
-cat <<EOF >/dev/null
 ## Hide some zygisk modules ##
 ksu_susfs add_sus_map /data/adb/modules/my_module/zygisk/arm64-v8a.so
 
-## Hide some map traces caused by some font module ##
+## Hide some map traces caused by some font modules ##
 ksu_susfs add_sus_map /system/fonts/Roboto-Regular.ttf
 ksu_susfs add_sus_map /system/fonts/RobotoStatic-Regular.ttf
 EOF
