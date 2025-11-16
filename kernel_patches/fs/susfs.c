@@ -461,7 +461,6 @@ bool susfs_is_inode_sus_path(struct inode *inode) {
 /* sus_mount */
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 bool susfs_hide_sus_mnts_for_all_procs = true; // hide sus mounts for all processes by default
-static LIST_HEAD(LH_SUS_MOUNT);
 extern void susfs_assign_fake_mnt_id(struct mount *mnt);
 
 void susfs_add_sus_mount(void __user **user_info) {
