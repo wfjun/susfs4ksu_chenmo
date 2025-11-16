@@ -73,7 +73,7 @@
 /******************
  ** Define Macro **
  ******************/
-#define ERR_CMD_NOT_SUPPORTED 255
+#define ERR_CMD_NOT_SUPPORTED 126
 #define log(fmt, msg...) printf(fmt, ##msg);
 #define PRT_MSG_IF_CMD_NOT_SUPPORTED(x, cmd) if (x == ERR_CMD_NOT_SUPPORTED) log("[-] CMD: '0x%x', SUSFS operation not supported, please enable it in kernel\n", cmd)
 
@@ -96,7 +96,6 @@ struct st_external_dir {
 
 struct st_susfs_sus_mount {
 	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
-	unsigned long           target_dev;
 	int                     err;
 };
 
@@ -256,8 +255,10 @@ static void print_help(void) {
 	log("      |--> Warning: All no root access granted user apps cannot see any sus paths in /sdcard/ unless you grant root access for the target app\n");
 	log("\n");
 	log("    add_sus_mount <mounted_path>\n");
-	log("      |--> Added mounted path will be hidden from /proc/self/[mounts|mountinfo|mountstats]\n");
-	log("      |--> Please be reminded that the target path must be added after the bind mount or overlay operation, otherwise it won't be effective\n");
+	log("      |--> Added mounted path will be assigned a fake mnt_id and mnt_group_id\n");
+	log("      |--> Added mounted path will be hidden from /proc/self/[mounts|mountinfo|mountstats] if 'hide_sus_mnts_for_all_procs' is enabled\n");
+	log("      * Important Note *\n");
+	log("      - Be reminded that the added mount should be in global namespace, otherwise it will result in different outcome\n");
 	log("\n");
 	log("    hide_sus_mnts_for_all_procs <0|1>\n");
 	log("      |--> 0 -> Do not hide sus mounts for all processes but only non ksu process\n");
@@ -401,15 +402,8 @@ int main(int argc, char *argv[]) {
 	// add_sus_mount
 	} else if (argc == 3 && !strcmp(argv[1], "add_sus_mount")) {
 		struct st_susfs_sus_mount info = {0};
-		struct stat sb;
 
-		info.err = get_file_stat(argv[2], &sb);
-		if (info.err) {
-			log("[-] Failed to get stat from path: '%s'\n", argv[2]);
-			return info.err;
-		}
 		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
-		info.target_dev = sb.st_dev;
 		info.err = ERR_CMD_NOT_SUPPORTED;
 		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_MOUNT, &info);
 		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_ADD_SUS_MOUNT);
