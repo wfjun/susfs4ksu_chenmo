@@ -2061,7 +2061,7 @@ index c8c46e294431..121909714b15 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index 517fa4ed885e..e5f1b0d47ddd 100644
+index 517fa4ed885e..095a324f1396 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,20 @@
@@ -2127,14 +2127,14 @@ index 517fa4ed885e..e5f1b0d47ddd 100644
  
 +#ifdef CONFIG_KSU_SUSFS
 +	if (likely(susfs_is_current_proc_umounted())) {
-+		goto orig_flow1;
++		goto orig_flow;
 +	}
 +
 +	if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
 +		ksu_handle_stat(&dfd, &filename, &flags);
 +	}
 +
-+orig_flow1:
++orig_flow:
 +#endif
 +
 +
@@ -2261,20 +2261,10 @@ index 18edd57b5fe8..5719b0ca344d 100644
  }
  
 diff --git a/kernel/reboot.c b/kernel/reboot.c
-index 344ceaf5ed13..d68822d0418e 100644
+index 344ceaf5ed13..c2d1a782d5a5 100644
 --- a/kernel/reboot.c
 +++ b/kernel/reboot.c
-@@ -18,6 +18,9 @@
- #include <linux/syscalls.h>
- #include <linux/syscore_ops.h>
- #include <linux/uaccess.h>
-+#ifdef CONFIG_KSU_SUSFS
-+#include <linux/susfs.h>
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 
- #include <trace/hooks/reboot.h>
- 
-@@ -693,6 +696,9 @@ EXPORT_SYMBOL_GPL(kernel_power_off);
+@@ -693,6 +693,9 @@ EXPORT_SYMBOL_GPL(kernel_power_off);
  
  DEFINE_MUTEX(system_transition_mutex);
  
@@ -2284,7 +2274,7 @@ index 344ceaf5ed13..d68822d0418e 100644
  /*
   * Reboot system call: for obvious reasons only root may call it,
   * and even root needs to set up some magic numbers in the registers
-@@ -708,6 +714,15 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+@@ -708,6 +711,15 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
  	char buffer[256];
  	int ret = 0;
  

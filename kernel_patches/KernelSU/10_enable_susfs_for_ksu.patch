@@ -1052,7 +1052,7 @@ index 431e0441..d459ebf4 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 016ac058..a142726d 100644
+index 016ac058..5379be92 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -27,6 +27,9 @@
@@ -1119,7 +1119,7 @@ index 016ac058..a142726d 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -135,6 +175,111 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -135,6 +175,110 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
@@ -1201,7 +1201,6 @@ index 016ac058..a142726d 100644
 +do_umount:
 +    if (!ksu_kernel_umount_enabled || !ksu_module_mounted) {
 +        goto skip_try_umount;
-+        
 +    }
 +
 +#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
