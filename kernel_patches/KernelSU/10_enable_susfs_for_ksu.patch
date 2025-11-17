@@ -243,7 +243,7 @@ index 645455e1..18637462 100644
 +endif
  # Keep a new line here!! Because someone may append config
 diff --git a/kernel/allowlist.c b/kernel/allowlist.c
-index 7b4d7e14..70463180 100644
+index 4fa59133..de729dff 100644
 --- a/kernel/allowlist.c
 +++ b/kernel/allowlist.c
 @@ -17,7 +17,9 @@
@@ -268,7 +268,7 @@ index 7b4d7e14..70463180 100644
  
      return result;
 diff --git a/kernel/apk_sign.c b/kernel/apk_sign.c
-index aea8e425..515bf402 100644
+index c7e23089..6d0bfc84 100644
 --- a/kernel/apk_sign.c
 +++ b/kernel/apk_sign.c
 @@ -314,5 +314,10 @@ module_param_cb(ksu_debug_manager_uid, &expected_size_ops,
@@ -520,7 +520,7 @@ index 2369abbc..4636ad2f 100644
 +#endif // #ifndef CONFIG_KSU_SUSFS
  }
 diff --git a/kernel/kernel_umount.c b/kernel/kernel_umount.c
-index 9b3a2615..2957b849 100644
+index fb5a95bf..5ef03c5e 100644
 --- a/kernel/kernel_umount.c
 +++ b/kernel/kernel_umount.c
 @@ -17,7 +17,11 @@
@@ -909,7 +909,7 @@ index 6e7002b0..f408edc8 100644
  static inline void ksu_invalidate_manager_uid()
  {
 diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
-index b5a52f85..ae23fbff 100644
+index b5a52f85..dac2db34 100644
 --- a/kernel/selinux/rules.c
 +++ b/kernel/selinux/rules.c
 @@ -127,6 +127,15 @@ void apply_kernelsu_rules()
@@ -919,7 +919,7 @@ index b5a52f85..ae23fbff 100644
 +#ifdef CONFIG_KSU_SUSFS
 +    // Allow umount in zygote process without installing zygisk
 +    ksu_allow(db, "zygote", "labeledfs", "filesystem", "unmount");
-+    susfs_set_kernel_sid();
++    susfs_set_priv_app_sid();
 +    susfs_set_init_sid();
 +    susfs_set_ksu_sid();
 +    susfs_set_zygote_sid();
@@ -929,7 +929,7 @@ index b5a52f85..ae23fbff 100644
  }
  
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index dfc48313..e8f9abea 100644
+index dfc48313..f8f3ddfc 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
 @@ -152,3 +152,96 @@ u32 ksu_get_ksu_file_sid()
@@ -940,14 +940,14 @@ index dfc48313..e8f9abea 100644
 +#ifdef CONFIG_KSU_SUSFS
 +#define KERNEL_INIT_DOMAIN "u:r:init:s0"
 +#define KERNEL_ZYGOTE_DOMAIN "u:r:zygote:s0"
-+#define KERNEL_KERNEL_DOMAIN "u:r:kernel:s0"
++#define KERNEL_PRIV_APP_DOMAIN "u:r:priv_app:s0:c512,c768"
 +#ifndef KERNEL_SU_DOMAIN
 +#define KERNEL_SU_DOMAIN "u:r:su:s0"
 +#endif // #ifndef KERNEL_SU_DOMAIN
 +u32 susfs_ksu_sid = 0;
 +u32 susfs_init_sid = 0;
 +u32 susfs_zygote_sid = 0;
-+u32 susfs_kernel_sid = 0;
++u32 susfs_priv_app_sid = 0;
 +
 +static inline void susfs_set_sid(const char *secctx_name, u32 *out_sid)
 +{
@@ -1024,13 +1024,13 @@ index dfc48313..e8f9abea 100644
 +    return unlikely(current_sid() == susfs_init_sid);
 +}
 +
-+void susfs_set_kernel_sid(void)
++void susfs_set_priv_app_sid(void)
 +{
-+    susfs_set_sid(KERNEL_KERNEL_DOMAIN, &susfs_kernel_sid);
++    susfs_set_sid(KERNEL_PRIV_APP_DOMAIN, &susfs_priv_app_sid);
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/kernel/selinux/selinux.h b/kernel/selinux/selinux.h
-index 431e0441..d459ebf4 100644
+index 431e0441..4b1d11d0 100644
 --- a/kernel/selinux/selinux.h
 +++ b/kernel/selinux/selinux.h
 @@ -25,4 +25,17 @@ u32 ksu_get_ksu_file_sid();
@@ -1047,7 +1047,7 @@ index 431e0441..d459ebf4 100644
 +bool susfs_is_current_ksu_domain(void);
 +void susfs_set_init_sid(void);
 +bool susfs_is_current_init_domain(void);
-+void susfs_set_kernel_sid(void);
++void susfs_set_priv_app_sid(void);
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  #endif
