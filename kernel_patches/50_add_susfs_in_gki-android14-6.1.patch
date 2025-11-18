@@ -544,7 +544,7 @@ index 1fa36df7b667..e997ba39c615 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5044..83323acf39fe 100644
+index 67d89ebb5044..db903927dd1f 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,39 @@
@@ -903,7 +903,7 @@ index 67d89ebb5044..83323acf39fe 100644
  	return ret;
  }
  
-@@ -4742,3 +5007,58 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -4742,3 +5007,46 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -949,19 +949,7 @@ index 67d89ebb5044..83323acf39fe 100644
 +	unlock_mount_hash();
 +}
 +#endif
-+#ifdef CONFIG_KSU_SUSFS
-+bool susfs_is_mnt_devname_ksu(struct path *path) {
-+	struct mount *mnt;
 +
-+	if (path && path->mnt) {
-+		mnt = real_mount(path->mnt);
-+		if (mnt && mnt->mnt_devname && !strcmp(mnt->mnt_devname, "KSU")) {
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+#endif
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
 index 55081ae3a6ec..9757e54b3e33 100644
 --- a/fs/notify/fdinfo.c
