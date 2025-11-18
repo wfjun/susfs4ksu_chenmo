@@ -670,7 +670,7 @@ index 5f45d9b2f84d..7bbc0b94067f 100644
  	if (IS_ERR(new_dentry))
  		goto exit4;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 2d0231797d0d..249a531492b7 100644
+index 2d0231797d0d..a680d3c87513 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,41 @@
@@ -1031,7 +1031,7 @@ index 2d0231797d0d..249a531492b7 100644
  	return ret;
  }
  
-@@ -5060,3 +5325,59 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5060,3 +5325,46 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -1075,19 +1075,6 @@ index 2d0231797d0d..249a531492b7 100644
 +	atomic64_add(1, &susfs_ksu_mounts);
 +
 +	unlock_mount_hash();
-+}
-+#endif
-+#ifdef CONFIG_KSU_SUSFS
-+bool susfs_is_mnt_devname_ksu(struct path *path) {
-+	struct mount *mnt;
-+
-+	if (path && path->mnt) {
-+		mnt = real_mount(path->mnt);
-+		if (mnt && mnt->mnt_devname && !strcmp(mnt->mnt_devname, "KSU")) {
-+			return true;
-+		}
-+	}
-+	return false;
 +}
 +#endif
 +
