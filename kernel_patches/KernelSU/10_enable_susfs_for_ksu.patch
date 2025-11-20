@@ -1,8 +1,8 @@
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index 67f177f4..301e4b15 100644
+index 67f177f4..4462f6ae 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -5,15 +5,141 @@ config KSU
+@@ -5,15 +5,122 @@ config KSU
  	depends on OVERLAY_FS
  	default y
  	help
@@ -48,26 +48,7 @@ index 67f177f4..301e4b15 100644
 +	help
 +		- Allow hiding the user-defined mount paths from /proc/self/[mounts|mountinfo|mountstat].
 +		- Effective on all processes for hiding mount entries.
-+		- Mounts mounted by process with ksu domain will be forced to be assigned the dev name "KSU".
 +		- mnt_id and mnt_group_id of the sus mount will be assigned to a much bigger number to solve the issue of id not being contiguous.
-+
-+config KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-+	bool "Enable to hide KSU's default mounts automatically (experimental)"
-+	depends on KSU_SUSFS_SUS_MOUNT
-+	default y
-+	help
-+		- Automatically add KSU's default mounts to sus_mount.
-+		- No susfs command is needed in userspace.
-+		- Only mount operation from process with ksu domain will be checked.
-+
-+config KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-+	bool "Enable to hide suspicious bind mounts automatically (experimental)"
-+	depends on KSU_SUSFS_SUS_MOUNT
-+	default y
-+	help
-+		- Automatically add binded mounts to sus_mount.
-+		- No susfs command is needed in userspace.
-+		- Only mount operation from process with ksu domain will be checked.
 +
 +config KSU_SUSFS_SUS_KSTAT
 +	bool "Enable to spoof suspicious kstat"
@@ -1423,7 +1404,7 @@ index 82161f7f..4f0d4f9d 100644
  #endif
 \ No newline at end of file
 diff --git a/kernel/supercalls.c b/kernel/supercalls.c
-index 5ce9280b..032a2d06 100644
+index 5ce9280b..ad951ac7 100644
 --- a/kernel/supercalls.c
 +++ b/kernel/supercalls.c
 @@ -11,6 +11,10 @@
@@ -1437,7 +1418,7 @@ index 5ce9280b..032a2d06 100644
  
  #include "supercalls.h"
  #include "arch.h"
-@@ -24,7 +28,56 @@
+@@ -24,7 +28,36 @@
  #include "selinux/selinux.h"
  #include "objsec.h"
  #include "file_wrapper.h"
@@ -1449,12 +1430,6 @@ index 5ce9280b..032a2d06 100644
 +bool susfs_is_boot_completed_triggered = false;
 +
 +extern bool susfs_is_umount_for_zygote_system_process_enabled;
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-+extern bool susfs_is_auto_add_sus_bind_mount_enabled;
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-+extern bool susfs_is_auto_add_sus_ksu_default_mount_enabled;
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
 +#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
 +extern bool susfs_is_auto_add_try_umount_for_bind_mount_enabled;
 +#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
@@ -1468,20 +1443,6 @@ index 5ce9280b..032a2d06 100644
 +    }
 +    pr_info("susfs_is_umount_for_zygote_system_process_enabled: %d\n", susfs_is_umount_for_zygote_system_process_enabled);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-+    if (!kern_path(DATA_ADB_NO_AUTO_ADD_SUS_BIND_MOUNT, 0, &path)) {
-+        susfs_is_auto_add_sus_bind_mount_enabled = false;
-+        path_put(&path);
-+    }
-+    pr_info("susfs_is_auto_add_sus_bind_mount_enabled: %d\n", susfs_is_auto_add_sus_bind_mount_enabled);
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-+    if (!kern_path(DATA_ADB_NO_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT, 0, &path)) {
-+        susfs_is_auto_add_sus_ksu_default_mount_enabled = false;
-+        path_put(&path);
-+    }
-+    pr_info("susfs_is_auto_add_sus_ksu_default_mount_enabled: %d\n", susfs_is_auto_add_sus_ksu_default_mount_enabled);
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
 +#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
 +    if (!kern_path(DATA_ADB_NO_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT, 0, &path)) {
 +        susfs_is_auto_add_try_umount_for_bind_mount_enabled = false;
@@ -1494,7 +1455,7 @@ index 5ce9280b..032a2d06 100644
  
  // Permission check functions
  bool only_manager(void)
-@@ -98,6 +151,10 @@ static int do_report_event(void __user *arg)
+@@ -98,6 +131,10 @@ static int do_report_event(void __user *arg)
          if (!post_fs_data_lock) {
              post_fs_data_lock = true;
              pr_info("post-fs-data triggered\n");
@@ -1505,7 +1466,7 @@ index 5ce9280b..032a2d06 100644
              on_post_fs_data();
          }
          break;
-@@ -108,6 +165,9 @@ static int do_report_event(void __user *arg)
+@@ -108,6 +145,9 @@ static int do_report_event(void __user *arg)
              boot_complete_lock = true;
              pr_info("boot_complete triggered\n");
              on_boot_completed();
@@ -1515,7 +1476,7 @@ index 5ce9280b..032a2d06 100644
          }
          break;
      }
-@@ -386,7 +446,9 @@ put_orig_file:
+@@ -386,7 +426,9 @@ put_orig_file:
  static int do_manage_mark(void __user *arg)
  {
      struct ksu_manage_mark_cmd cmd;
@@ -1525,7 +1486,7 @@ index 5ce9280b..032a2d06 100644
  
      if (copy_from_user(&cmd, arg, sizeof(cmd))) {
          pr_err("manage_mark: copy_from_user failed\n");
-@@ -395,6 +457,7 @@ static int do_manage_mark(void __user *arg)
+@@ -395,6 +437,7 @@ static int do_manage_mark(void __user *arg)
  
      switch (cmd.operation) {
      case KSU_MARK_GET: {
@@ -1533,7 +1494,7 @@ index 5ce9280b..032a2d06 100644
          // Get task mark status
          ret = ksu_get_task_mark(cmd.pid);
          if (ret < 0) {
-@@ -403,8 +466,12 @@ static int do_manage_mark(void __user *arg)
+@@ -403,8 +446,12 @@ static int do_manage_mark(void __user *arg)
          }
          cmd.result = (u32)ret;
          break;
@@ -1546,7 +1507,7 @@ index 5ce9280b..032a2d06 100644
          if (cmd.pid == 0) {
              ksu_mark_all_process();
          } else {
-@@ -415,9 +482,13 @@ static int do_manage_mark(void __user *arg)
+@@ -415,9 +462,13 @@ static int do_manage_mark(void __user *arg)
                  return ret;
              }
          }
@@ -1560,7 +1521,7 @@ index 5ce9280b..032a2d06 100644
          if (cmd.pid == 0) {
              ksu_unmark_all_process();
          } else {
-@@ -428,11 +499,18 @@ static int do_manage_mark(void __user *arg)
+@@ -428,11 +479,18 @@ static int do_manage_mark(void __user *arg)
                  return ret;
              }
          }
@@ -1579,7 +1540,7 @@ index 5ce9280b..032a2d06 100644
          break;
      }
      default: {
-@@ -629,6 +707,7 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -629,6 +687,7 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -1587,7 +1548,7 @@ index 5ce9280b..032a2d06 100644
  static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
  {
      struct pt_regs *real_regs = PT_REAL_REGS(regs);
-@@ -662,7 +741,128 @@ static struct kprobe reboot_kp = {
+@@ -662,7 +721,124 @@ static struct kprobe reboot_kp = {
      .symbol_name = REBOOT_SYMBOL,
      .pre_handler = reboot_handler_pre,
  };
@@ -1619,10 +1580,6 @@ index 5ce9280b..032a2d06 100644
 +        }
 +#endif //#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+        if (cmd == CMD_SUSFS_ADD_SUS_MOUNT) {
-+            susfs_add_sus_mount(arg);
-+            return 0;
-+        }
 +        if (cmd == CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS) {
 +            susfs_set_hide_sus_mnts_for_all_procs(arg);
 +            return 0;
@@ -1716,7 +1673,7 @@ index 5ce9280b..032a2d06 100644
  
  void ksu_supercalls_init(void)
  {
-@@ -673,16 +873,22 @@ void ksu_supercalls_init(void)
+@@ -673,16 +849,22 @@ void ksu_supercalls_init(void)
          pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name, ksu_ioctl_handlers[i].cmd);
      }
  
