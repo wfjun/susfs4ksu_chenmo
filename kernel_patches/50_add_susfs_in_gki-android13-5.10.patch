@@ -1972,7 +1972,7 @@ index c6a2e10983f8..f6bfcff37ed0 100644
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index d42b44dc0e49..0f25c2bddc5d 100644
+index d42b44dc0e49..68a3431ddbb3 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,6 +9,10 @@
@@ -2010,18 +2010,6 @@ index d42b44dc0e49..0f25c2bddc5d 100644
  }
  EXPORT_SYMBOL(vfs_statfs);
  
-@@ -240,6 +256,11 @@ static int vfs_ustat(dev_t dev, struct kstatfs *sbuf)
- 	if (!s)
- 		return -EINVAL;
- 
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (unlikely(s->s_root->d_inode->i_mapping->flags & BIT_SUS_MOUNT)) {
-+		return -EINVAL;
-+	}
-+#endif
- 	err = statfs_by_dentry(s->s_root, sbuf);
- 	drop_super(s);
- 	return err;
 diff --git a/include/linux/mount.h b/include/linux/mount.h
 index 2f64e66f9c8c..591bca2a690b 100644
 --- a/include/linux/mount.h
