@@ -27,7 +27,7 @@
 #define CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH 0x55551
 #define CMD_SUSFS_SET_SDCARD_ROOT_PATH 0x55552
 #define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55553
-#define CMD_SUSFS_ADD_SUS_MOUNT 0x55560
+#define CMD_SUSFS_ADD_SUS_MOUNT 0x55560 /* deprecated */
 #define CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS 0x55561
 #define CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE 0x55562
 #define CMD_SUSFS_ADD_SUS_KSTAT 0x55570
@@ -91,11 +91,6 @@ struct st_external_dir {
 	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
 	bool                    is_inited;
 	int                     cmd;
-	int                     err;
-};
-
-struct st_susfs_sus_mount {
-	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
 	int                     err;
 };
 
@@ -254,12 +249,6 @@ static void print_help(void) {
 	log("      |--> To hide paths after /sdcard/, first you need to tell the susfs kernel where is the actual path '/sdcard' located, as it may vary on different phones\n");
 	log("      |--> Warning: All no root access granted user apps cannot see any sus paths in /sdcard/ unless you grant root access for the target app\n");
 	log("\n");
-	log("    add_sus_mount <mounted_path>\n");
-	log("      |--> Added mounted path will be assigned a fake mnt_id and mnt_group_id\n");
-	log("      |--> Added mounted path will be hidden from /proc/self/[mounts|mountinfo|mountstats] if 'hide_sus_mnts_for_all_procs' is enabled\n");
-	log("      * Important Note *\n");
-	log("      - Be reminded that the added mount should be in global namespace, otherwise it will result in different outcome\n");
-	log("\n");
 	log("    hide_sus_mnts_for_all_procs <0|1>\n");
 	log("      |--> 0 -> Do not hide sus mounts for all processes but only non ksu process\n");
 	log("      |--> 1 -> Hide all sus mounts for all processes no matter they are ksu processes or not\n");
@@ -398,15 +387,6 @@ int main(int argc, char *argv[]) {
 		info.cmd = CMD_SUSFS_SET_SDCARD_ROOT_PATH;
 		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_SET_SDCARD_ROOT_PATH, &info);
 		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_SET_SDCARD_ROOT_PATH);
-		return info.err;
-	// add_sus_mount
-	} else if (argc == 3 && !strcmp(argv[1], "add_sus_mount")) {
-		struct st_susfs_sus_mount info = {0};
-
-		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
-		info.err = ERR_CMD_NOT_SUPPORTED;
-		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_MOUNT, &info);
-		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_ADD_SUS_MOUNT);
 		return info.err;
 	// hide_sus_mnts_for_all_procs
 	} else if (argc == 3 && !strcmp(argv[1], "hide_sus_mnts_for_all_procs")) {
