@@ -1,8 +1,8 @@
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index 67f177f4..4462f6ae 100644
+index 67f177f4..862dc188 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -5,15 +5,122 @@ config KSU
+@@ -5,15 +5,113 @@ config KSU
  	depends on OVERLAY_FS
  	default y
  	help
@@ -64,16 +64,7 @@ index 67f177f4..4462f6ae 100644
 +	default y
 +	help
 +		- Allow using try_umount to umount other user-defined mount paths prior to ksu's default umount paths.
-+		- Effective on all NO-root-access-granted processes.
-+
-+config KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-+	bool "Enable to add bind mounts to ksu's try_umount automatically (experimental)"
-+	depends on KSU_SUSFS_TRY_UMOUNT
-+	default y
-+	help
-+		- Automatically add binded mounts to ksu's try_umount.
-+		- No susfs command is needed in userspace.
-+		- Only mount operation from process with ksu domain will be checked.
++		- Effective only on zygote spawned umounted user app process.
 +
 +config KSU_SUSFS_SPOOF_UNAME
 +	bool "Enable to spoof uname"
@@ -501,7 +492,7 @@ index 2369abbc..4636ad2f 100644
 +#endif // #ifndef CONFIG_KSU_SUSFS
  }
 diff --git a/kernel/kernel_umount.c b/kernel/kernel_umount.c
-index 3312ba1a..10462201 100644
+index 3312ba1a..d79dafe9 100644
 --- a/kernel/kernel_umount.c
 +++ b/kernel/kernel_umount.c
 @@ -17,7 +17,11 @@
@@ -516,17 +507,12 @@ index 3312ba1a..10462201 100644
  
  static int kernel_umount_feature_get(u64 *value)
  {
-@@ -50,7 +54,20 @@ static void ksu_umount_mnt(struct path *path, int flags)
+@@ -50,7 +54,15 @@ static void ksu_umount_mnt(struct path *path, int flags)
      }
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+#if defined(CONFIG_KSU_SUSFS_TRY_UMOUNT) && defined(CONFIG_KSU_SUSFS_ENABLE_LOG)
 +extern bool susfs_is_log_enabled;
-+#endif // #if defined(CONFIG_KSU_SUSFS_TRY_UMOUNT) && defined(CONFIG_KSU_SUSFS_ENABLE_LOG)
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+extern void susfs_try_umount(void);
-+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
 +#ifndef CONFIG_KSU_SUSFS_TRY_UMOUNT
@@ -537,30 +523,15 @@ index 3312ba1a..10462201 100644
  {
      struct path path;
      int err = kern_path(mnt, 0, &path);
-@@ -64,9 +81,22 @@ static void try_umount(const char *mnt, int flags)
-         return;
-     }
- 
-+#if defined(CONFIG_KSU_SUSFS_TRY_UMOUNT) && defined(CONFIG_KSU_SUSFS_ENABLE_LOG)
-+    if (susfs_is_log_enabled) {
-+        pr_info("susfs: umounting '%s'\n", mnt);
-+    }
-+#endif // #if defined(CONFIG_KSU_SUSFS_TRY_UMOUNT) && defined(CONFIG_KSU_SUSFS_ENABLE_LOG)
-+
+@@ -67,6 +79,7 @@ static void try_umount(const char *mnt, int flags)
      ksu_umount_mnt(&path, flags);
  }
  
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+void susfs_try_umount_all(void) {
-+    susfs_try_umount();
-+}
-+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+
 +#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
  struct umount_tw {
      struct callback_head cb;
      const struct cred *old_cred;
-@@ -101,6 +131,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
+@@ -101,6 +114,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
  {
      struct umount_tw *tw;
  
@@ -568,7 +539,7 @@ index 3312ba1a..10462201 100644
      // this hook is used for umounting overlayfs for some uid, if there isn't any module mounted, just ignore it!
      if (!ksu_module_mounted) {
          return 0;
-@@ -127,6 +158,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
+@@ -127,6 +141,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
          pr_info("handle umount ignore non zygote child: %d\n", current->pid);
          return 0;
      }
@@ -576,7 +547,7 @@ index 3312ba1a..10462201 100644
      // umount the target mnt
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
-@@ -148,6 +180,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
+@@ -148,6 +163,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
  
      return 0;
  }
@@ -1018,7 +989,7 @@ index 431e0441..4b1d11d0 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 016ac058..1afc32dc 100644
+index 016ac058..12797fc1 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -27,6 +27,9 @@
@@ -1031,7 +1002,7 @@ index 016ac058..1afc32dc 100644
  
  #include "allowlist.h"
  #include "setuid_hook.h"
-@@ -36,9 +39,46 @@
+@@ -36,9 +39,37 @@
  #include "selinux/selinux.h"
  #include "seccomp_cache.h"
  #include "supercalls.h"
@@ -1041,12 +1012,6 @@ index 016ac058..1afc32dc 100644
  #include "kernel_umount.h"
  
 +#ifdef CONFIG_KSU_SUSFS
-+static inline bool is_some_system_uid(uid_t uid)
-+{
-+    uid %= 100000;
-+    return (uid >= 1000 && uid < 10000);
-+}
-+
 +static inline bool is_zygote_isolated_service_uid(uid_t uid)
 +{
 +    uid %= 100000;
@@ -1059,8 +1024,6 @@ index 016ac058..1afc32dc 100644
 +    return (uid >= 10000 && uid < 19999);
 +}
 +
-+bool susfs_is_umount_for_zygote_system_process_enabled = false;
-+
 +extern u32 susfs_zygote_sid;
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +extern void susfs_run_sus_path_loop(uid_t uid);
@@ -1070,15 +1033,14 @@ index 016ac058..1afc32dc 100644
 +extern void susfs_reorder_mnt_id(void);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+extern void susfs_try_umount_all(void);
++extern void susfs_try_umount(uid_t uid);
 +#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  static bool ksu_enhanced_security_enabled = false;
  
  static int enhanced_security_feature_get(u64 *value)
-@@ -71,6 +111,7 @@ static inline bool is_allow_su()
+@@ -71,6 +102,7 @@ static inline bool is_allow_su()
      return ksu_is_allow_uid_for_current(current_uid().val);
  }
  
@@ -1086,13 +1048,11 @@ index 016ac058..1afc32dc 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -135,6 +176,115 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -135,6 +167,107 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
 +#else
-+extern bool ksu_kernel_umount_enabled;
-+extern bool ksu_module_mounted;
 +int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid){
 +    // we rely on the fact that zygote always call setresuid(3) with same uids
 +    uid_t new_uid = ruid;
@@ -1151,11 +1111,6 @@ index 016ac058..1afc32dc 100644
 +        goto do_umount;
 +    }
 +
-+    // Lastly, Check if spawned process is some system process and needs to be umounted
-+    if (unlikely(is_some_system_uid(new_uid) && susfs_is_umount_for_zygote_system_process_enabled)) {
-+        goto do_umount;
-+    }
-+
 +    if (ksu_is_allow_uid_for_current(new_uid)) {
 +        if (current->seccomp.mode == SECCOMP_MODE_FILTER &&
 +            current->seccomp.filter) {
@@ -1168,19 +1123,18 @@ index 016ac058..1afc32dc 100644
 +    return 0;
 +
 +do_umount:
++#ifndef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +    if (!ksu_kernel_umount_enabled || !ksu_module_mounted) {
-+        goto skip_try_umount;
++        goto skip_ksu_handle_umount;
 +    }
 +
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+    pr_info("susfs: running susfs_try_umount_all() for uid: %u\n", new_uid);
-+    susfs_try_umount_all();
-+#else
 +    // Handle kernel umount
 +    ksu_handle_umount(old_uid, new_uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +
-+skip_try_umount:
++skip_ksu_handle_umount:
++#else
++    susfs_try_umount(new_uid);
++#endif // #ifndef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +
 +    get_task_struct(current);
 +
@@ -1404,7 +1358,7 @@ index 82161f7f..4f0d4f9d 100644
  #endif
 \ No newline at end of file
 diff --git a/kernel/supercalls.c b/kernel/supercalls.c
-index 5ce9280b..ad951ac7 100644
+index 5ce9280b..404190ac 100644
 --- a/kernel/supercalls.c
 +++ b/kernel/supercalls.c
 @@ -11,6 +11,10 @@
@@ -1418,7 +1372,7 @@ index 5ce9280b..ad951ac7 100644
  
  #include "supercalls.h"
  #include "arch.h"
-@@ -24,7 +28,36 @@
+@@ -24,7 +28,13 @@
  #include "selinux/selinux.h"
  #include "objsec.h"
  #include "file_wrapper.h"
@@ -1428,45 +1382,11 @@ index 5ce9280b..ad951ac7 100644
 +
 +#ifdef CONFIG_KSU_SUSFS
 +bool susfs_is_boot_completed_triggered = false;
-+
-+extern bool susfs_is_umount_for_zygote_system_process_enabled;
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-+extern bool susfs_is_auto_add_try_umount_for_bind_mount_enabled;
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-+
-+static void susfs_on_post_fs_data(void) {
-+    struct path path;
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+    if (!kern_path(DATA_ADB_UMOUNT_FOR_ZYGOTE_SYSTEM_PROCESS, 0, &path)) {
-+        susfs_is_umount_for_zygote_system_process_enabled = true;
-+        path_put(&path);
-+    }
-+    pr_info("susfs_is_umount_for_zygote_system_process_enabled: %d\n", susfs_is_umount_for_zygote_system_process_enabled);
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-+    if (!kern_path(DATA_ADB_NO_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT, 0, &path)) {
-+        susfs_is_auto_add_try_umount_for_bind_mount_enabled = false;
-+        path_put(&path);
-+    }
-+    pr_info("susfs_is_auto_add_try_umount_for_bind_mount_enabled: %d\n", susfs_is_auto_add_try_umount_for_bind_mount_enabled);
-+#endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-+}
 +#endif // #ifdef CONFIG_KSU_SUSFS
  
  // Permission check functions
  bool only_manager(void)
-@@ -98,6 +131,10 @@ static int do_report_event(void __user *arg)
-         if (!post_fs_data_lock) {
-             post_fs_data_lock = true;
-             pr_info("post-fs-data triggered\n");
-+#ifdef CONFIG_KSU_SUSFS
-+            susfs_on_post_fs_data();
-+            pr_info("susfs_on_post_fs_data triggered\n");
-+#endif // #ifdef CONFIG_KSU_SUSFS
-             on_post_fs_data();
-         }
-         break;
-@@ -108,6 +145,9 @@ static int do_report_event(void __user *arg)
+@@ -108,6 +118,9 @@ static int do_report_event(void __user *arg)
              boot_complete_lock = true;
              pr_info("boot_complete triggered\n");
              on_boot_completed();
@@ -1476,7 +1396,7 @@ index 5ce9280b..ad951ac7 100644
          }
          break;
      }
-@@ -386,7 +426,9 @@ put_orig_file:
+@@ -386,7 +399,9 @@ put_orig_file:
  static int do_manage_mark(void __user *arg)
  {
      struct ksu_manage_mark_cmd cmd;
@@ -1486,7 +1406,7 @@ index 5ce9280b..ad951ac7 100644
  
      if (copy_from_user(&cmd, arg, sizeof(cmd))) {
          pr_err("manage_mark: copy_from_user failed\n");
-@@ -395,6 +437,7 @@ static int do_manage_mark(void __user *arg)
+@@ -395,6 +410,7 @@ static int do_manage_mark(void __user *arg)
  
      switch (cmd.operation) {
      case KSU_MARK_GET: {
@@ -1494,7 +1414,7 @@ index 5ce9280b..ad951ac7 100644
          // Get task mark status
          ret = ksu_get_task_mark(cmd.pid);
          if (ret < 0) {
-@@ -403,8 +446,12 @@ static int do_manage_mark(void __user *arg)
+@@ -403,8 +419,12 @@ static int do_manage_mark(void __user *arg)
          }
          cmd.result = (u32)ret;
          break;
@@ -1507,7 +1427,7 @@ index 5ce9280b..ad951ac7 100644
          if (cmd.pid == 0) {
              ksu_mark_all_process();
          } else {
-@@ -415,9 +462,13 @@ static int do_manage_mark(void __user *arg)
+@@ -415,9 +435,13 @@ static int do_manage_mark(void __user *arg)
                  return ret;
              }
          }
@@ -1521,7 +1441,7 @@ index 5ce9280b..ad951ac7 100644
          if (cmd.pid == 0) {
              ksu_unmark_all_process();
          } else {
-@@ -428,11 +479,18 @@ static int do_manage_mark(void __user *arg)
+@@ -428,11 +452,18 @@ static int do_manage_mark(void __user *arg)
                  return ret;
              }
          }
@@ -1540,7 +1460,7 @@ index 5ce9280b..ad951ac7 100644
          break;
      }
      default: {
-@@ -629,6 +687,7 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -629,6 +660,7 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -1548,7 +1468,7 @@ index 5ce9280b..ad951ac7 100644
  static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
  {
      struct pt_regs *real_regs = PT_REAL_REGS(regs);
-@@ -662,7 +721,124 @@ static struct kprobe reboot_kp = {
+@@ -662,7 +694,124 @@ static struct kprobe reboot_kp = {
      .symbol_name = REBOOT_SYMBOL,
      .pre_handler = reboot_handler_pre,
  };
@@ -1673,7 +1593,7 @@ index 5ce9280b..ad951ac7 100644
  
  void ksu_supercalls_init(void)
  {
-@@ -673,16 +849,22 @@ void ksu_supercalls_init(void)
+@@ -673,16 +822,22 @@ void ksu_supercalls_init(void)
          pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name, ksu_ioctl_handlers[i].cmd);
      }
  

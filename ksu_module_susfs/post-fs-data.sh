@@ -11,15 +11,6 @@ source ${MODDIR}/utils.sh
 ## - The following command can be run at other stages like service.sh, boot-completed.sh etc..,
 ## - This module is just an demo showing how to use ksu_susfs tool to commuicate with kernel
 ##
-## - for add_sus_path and add_sus_kstat if target file/dir is re-created or its ino number is changed, you have to re-run the same susfs command
-## - for add_sus_mount, if target path is umounted globally, you have to re-run the same susfs command
-##
-## - add_sus_path, add_sus_kstat, add_sus_mount and set_uname are allowed to be updated with new spoofed values
-##   that said, you can run multiple times with same target input but with different spoofed values.
-##
-## - BE CAUTIOUS that add_sus_path, add_sus_mount must be added after overlay or mounted operations on target files/direcotories,
-##   because susfs now mainly compare target's inode to determine whether it is a sus path, sus kstat or sus mount.
-##
 
 #### Hide target path and all its sub-paths from all user app processes which have no root permission granted ####
 ## Make sure the target file/directory has no more overlay/mount operation on going. Or add it after it is done being overlayed or mounted ##
@@ -30,29 +21,7 @@ ${SUSFS_BIN} add_sus_path /vendor/bin/install-recovery.sh
 ${SUSFS_BIN} add_sus_path /system/bin/install-recovery.sh
 EOF
 
-#### Hide the mounted path in /proc/self/[mounts|mountstat|mountinfo] for all processes ####
-## Make sure the target file/directory has no more overlay/mount operation on going. Or add it after it is done being overlayed or mounted ##
-cat <<EOF >/dev/null
-# for default ksu mounts #
-${SUSFS_BIN} add_sus_mount /data/adb/modules
-${SUSFS_BIN} add_sus_mount /debug_ramdisk
-# for host file #
-${SUSFS_BIN} add_sus_mount /system/etc/hosts
-## for lsposed, choose those that show up in your mountinfo, no need to add them all ##
-# also somehow you may need to add the source path to sus mount as well like below #
-${SUSFS_BIN} add_sus_mount /data/adb/modules/zygisk_lsposed/bin/dex2oat
-${SUSFS_BIN} add_sus_mount /data/adb/modules/zygisk_lsposed/bin/dex2oat32
-${SUSFS_BIN} add_sus_mount /data/adb/modules/zygisk_lsposed/bin/dex2oat64
-${SUSFS_BIN} add_sus_mount /system/apex/com.android.art/bin/dex2oat
-${SUSFS_BIN} add_sus_mount /system/apex/com.android.art/bin/dex2oat32
-${SUSFS_BIN} add_sus_mount /system/apex/com.android.art/bin/dex2oat64
-${SUSFS_BIN} add_sus_mount /apex/com.android.art/bin/dex2oat
-${SUSFS_BIN} add_sus_mount /apex/com.android.art/bin/dex2oat32
-${SUSFS_BIN} add_sus_mount /apex/com.android.art/bin/dex2oat64
-EOF
-
 #### Umount the mounted path for no root granted process ####
-# Please be reminded that susfs's try_umount takes precedence of ksu's try_umount #
 cat <<EOF >/dev/null
 # for /system/etc/hosts #
 ${SUSFS_BIN} add_try_umount /system/etc/hosts 1
@@ -144,11 +113,12 @@ for device in $(ls -Ld /proc/fs/jbd2/loop*8 | sed 's|/proc/fs/jbd2/||; s|-8||');
 done
 EOF
 
-#### Umount for all zygote spawned services ####
+#### Umount for zygote spawned isolated services ####
 cat <<EOF >/dev/null
-# - set to 1 to enable umount for all zygote spawned services, but be reminded that
+# - set to 1 to enable umount for zygote spawned isolated services, but be reminded that
 #   it may break some modules that ovsrlay framework files / overlay apks. Boot into
 #   KSU rescue mode if you encounter bootloop here.
+# - Install ZygiskNext or ReZygisk may solve the bootloop issue.
 ksu_susfs umount_for_zygote_iso_service 1
 EOF
 
