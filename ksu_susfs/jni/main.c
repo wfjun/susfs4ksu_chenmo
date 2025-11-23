@@ -33,7 +33,7 @@
 #define CMD_SUSFS_ADD_SUS_KSTAT 0x55570
 #define CMD_SUSFS_UPDATE_SUS_KSTAT 0x55571
 #define CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY 0x55572
-#define CMD_SUSFS_ADD_TRY_UMOUNT 0x55580
+#define CMD_SUSFS_ADD_TRY_UMOUNT 0x55580 /* deprecated */
 #define CMD_SUSFS_SET_UNAME 0x55590
 #define CMD_SUSFS_ENABLE_LOG 0x555a0
 #define CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG 0x555b0
@@ -120,12 +120,6 @@ struct st_susfs_sus_kstat {
 	long                    spoofed_ctime_tv_nsec;
 	unsigned long           spoofed_blksize;
 	unsigned long long      spoofed_blocks;
-	int                     err;
-};
-
-struct st_susfs_try_umount {
-	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
-	int                     mnt_mode;
 	int                     err;
 };
 
@@ -287,11 +281,6 @@ static void print_help(void) {
 	log("    update_sus_kstat_full_clone </path/of/file_or_directory>\n");
 	log("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
 	log("      |--> This updates the target ino only, other stat members are remained the same as the original stat\n");
-	log("\n");
-	log("    add_try_umount </path/of/file_or_directory> <mode>\n");
-	log("      |--> Added path will be umounted from KSU for all UIDs that are NOT su allowed, and profile template configured with umount\n");
-	log("      |--> <mode>: 0 -> umount with no flags, 1 -> umount with MNT_DETACH\n");
-	log("      |--> NOTE: susfs umount takes precedence of ksu umount\n");
 	log("\n");
 	log("    set_uname <release> <version>\n");
 	log("      |--> NOTE: Only 'release' and <version> are spoofed as others are no longer needed\n");
@@ -599,40 +588,6 @@ int main(int argc, char *argv[]) {
 		info.err = ERR_CMD_NOT_SUPPORTED;
 		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_UPDATE_SUS_KSTAT, &info);
 		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_UPDATE_SUS_KSTAT);
-		return info.err;
-	// add_try_umount
-	} else if (argc == 4 && !strcmp(argv[1], "add_try_umount")) {
-		struct st_susfs_try_umount info = {0};
-		char* endptr;
-		char abs_path[PATH_MAX], *p_abs_path;
-		
-		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
-		p_abs_path = realpath(info.target_pathname, abs_path);
-		if (p_abs_path == NULL) {
-			perror("realpath");
-			return errno;
-		}
-		if (!strcmp(p_abs_path, "/odm") ||
-			!strcmp(p_abs_path, "/system") ||
-			!strcmp(p_abs_path, "/vendor") ||
-			!strcmp(p_abs_path, "/product") ||
-			!strcmp(p_abs_path, "/system_ext") ||
-			!strcmp(p_abs_path, "/data/adb/modules")) {
-			log("[-] %s cannot be added to try_umount, because it will be umounted by ksu lastly\n", p_abs_path);
-			return -EINVAL;
-		}
-		if (strcmp(argv[3], "0") && strcmp(argv[3], "1")) {
-			print_help();
-			return -EINVAL;
-		}
-		info.mnt_mode = strtol(argv[3], &endptr, 10);
-		if (*endptr != '\0') {
-			print_help();
-			return -EINVAL;
-		}
-		info.err = ERR_CMD_NOT_SUPPORTED;
-		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_TRY_UMOUNT, &info);
-		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_ADD_TRY_UMOUNT);
 		return info.err;
 	// set_uname
 	} else if (argc == 4 && !strcmp(argv[1], "set_uname")) {
