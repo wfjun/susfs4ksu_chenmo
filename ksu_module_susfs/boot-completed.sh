@@ -5,36 +5,6 @@ MODDIR=/data/adb/modules/susfs4ksu
 
 SUSFS_BIN=/data/adb/ksu/bin/ksu_susfs
 
-#### Manually add the sus mounts to susfs's try_umount list ####
-## - Please note that the order matters as added paths are umounted in reversed order
-## - It is suggested to add paths during boot-completed since most of mounts are done
-##   in post-fs-data.sh or service.sh stage
-cat <<EOF >/dev/null
-# for /system/etc/hosts #
-${SUSFS_BIN} add_try_umount /system/etc/hosts 1
-# for lsposed, choose those that show up in your mountinfo, no need to add them all #
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat 1
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat32 1
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat64 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat32 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat64 1
-EOF
-
-#### Auto retrieve sus mounts from /proc/1/mountinfo and add to try_umount ####
-## - Create file to '/data/adb/susfs_no_auto_add_try_umount' if you want to disable
-##   the auto add_try_umount
-cat <<EOF >/dev/null
-{
-        if [ ! -f "/data/adb/susfs_no_auto_add_try_umount" ]; then
-                cat /proc/1/mountinfo | grep -E "^500000 .* KSU .*$|^500000 .* shared:.*$" | awk '{print $5}' > /data/adb/sus_mounts.txt
-                while read -r LINE; do
-                        ${SUSFS_BIN} add_try_umount "${LINE}" 1
-                done < /data/adb/sus_mounts.txt
-        fi
-}
-EOF
-
 #### Hide path like /sdcard/<target_root_dir> from all user app processes without root access ####
 cat <<EOF >/dev/null
 ## First we need to wait until files are accessible in /sdcard ##

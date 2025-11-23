@@ -21,22 +21,8 @@ ${SUSFS_BIN} add_sus_path /vendor/bin/install-recovery.sh
 ${SUSFS_BIN} add_sus_path /system/bin/install-recovery.sh
 EOF
 
-#### Umount the mounted path for no root granted process ####
-cat <<EOF >/dev/null
-# for /system/etc/hosts #
-${SUSFS_BIN} add_try_umount /system/etc/hosts 1
-# for lsposed, choose those that show up in your mountinfo, no need to add them all #
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat 1
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat32 1
-${SUSFS_BIN} add_try_umount /system/apex/com.android.art/bin/dex2oat64 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat32 1
-${SUSFS_BIN} add_try_umount /apex/com.android.art/bin/dex2oat64 1
-EOF
-
 #### Spoof the stat of file/directory dynamically ####
 ## Important Note: 
-##  - All paths set with sus_kstat and bind mounted will not be added to try_umount list
 ##  - It is stronly suggested to use dynamically if the target path will be mounted
 cat <<EOF >/dev/null
 # First, clone the permission before adding to sus_kstat
