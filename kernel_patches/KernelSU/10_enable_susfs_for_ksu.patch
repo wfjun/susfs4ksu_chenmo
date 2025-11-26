@@ -867,7 +867,7 @@ index 431e0441..4b1d11d0 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 016ac058..2e9083a6 100644
+index 016ac058..d9ecd63f 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -27,6 +27,9 @@
@@ -880,7 +880,7 @@ index 016ac058..2e9083a6 100644
  
  #include "allowlist.h"
  #include "setuid_hook.h"
-@@ -36,9 +39,34 @@
+@@ -36,9 +39,33 @@
  #include "selinux/selinux.h"
  #include "seccomp_cache.h"
  #include "supercalls.h"
@@ -893,7 +893,7 @@ index 016ac058..2e9083a6 100644
 +static inline bool is_zygote_isolated_service_uid(uid_t uid)
 +{
 +    uid %= 100000;
-+    return (uid >= 90000 && uid < 100000);
++    return (uid >= 99000 && uid < 100000);
 +}
 +
 +static inline bool is_zygote_normal_app_uid(uid_t uid)
@@ -907,7 +907,6 @@ index 016ac058..2e9083a6 100644
 +extern void susfs_run_sus_path_loop(uid_t uid);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+extern bool susfs_is_umount_for_zygote_iso_service_enabled;
 +extern void susfs_reorder_mnt_id(void);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +#endif // #ifdef CONFIG_KSU_SUSFS
@@ -915,7 +914,7 @@ index 016ac058..2e9083a6 100644
  static bool ksu_enhanced_security_enabled = false;
  
  static int enhanced_security_feature_get(u64 *value)
-@@ -71,6 +99,7 @@ static inline bool is_allow_su()
+@@ -71,6 +98,7 @@ static inline bool is_allow_su()
      return ksu_is_allow_uid_for_current(current_uid().val);
  }
  
@@ -923,7 +922,7 @@ index 016ac058..2e9083a6 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -135,6 +164,97 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -135,6 +163,97 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
@@ -964,7 +963,7 @@ index 016ac058..2e9083a6 100644
 +
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +    // Check if spawned process is isolated service first, and force to do umount if so  
-+    if (is_zygote_isolated_service_uid(new_uid) && susfs_is_umount_for_zygote_iso_service_enabled) {
++    if (is_zygote_isolated_service_uid(new_uid)) {
 +        goto do_umount;
 +    }
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
@@ -1206,7 +1205,7 @@ index 82161f7f..4f0d4f9d 100644
  #endif
 \ No newline at end of file
 diff --git a/kernel/supercalls.c b/kernel/supercalls.c
-index 5ce9280b..a01f1a61 100644
+index 5ce9280b..c04654ce 100644
 --- a/kernel/supercalls.c
 +++ b/kernel/supercalls.c
 @@ -11,6 +11,10 @@
@@ -1321,7 +1320,7 @@ index 5ce9280b..a01f1a61 100644
  static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
  {
      struct pt_regs *real_regs = PT_REAL_REGS(regs);
-@@ -662,7 +699,118 @@ static struct kprobe reboot_kp = {
+@@ -662,7 +699,114 @@ static struct kprobe reboot_kp = {
      .symbol_name = REBOOT_SYMBOL,
      .pre_handler = reboot_handler_pre,
  };
@@ -1355,10 +1354,6 @@ index 5ce9280b..a01f1a61 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +        if (cmd == CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS) {
 +            susfs_set_hide_sus_mnts_for_all_procs(arg);
-+            return 0;
-+        }
-+        if (cmd == CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE) {
-+            susfs_set_umount_for_zygote_iso_service(arg);
 +            return 0;
 +        }
 +#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
@@ -1440,7 +1435,7 @@ index 5ce9280b..a01f1a61 100644
  
  void ksu_supercalls_init(void)
  {
-@@ -673,16 +821,22 @@ void ksu_supercalls_init(void)
+@@ -673,16 +817,22 @@ void ksu_supercalls_init(void)
          pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name, ksu_ioctl_handlers[i].cmd);
      }
  

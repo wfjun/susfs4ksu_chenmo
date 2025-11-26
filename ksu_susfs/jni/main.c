@@ -29,7 +29,7 @@
 #define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55553
 #define CMD_SUSFS_ADD_SUS_MOUNT 0x55560 /* deprecated */
 #define CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS 0x55561
-#define CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE 0x55562
+#define CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE 0x55562 /* deprecated */
 #define CMD_SUSFS_ADD_SUS_KSTAT 0x55570
 #define CMD_SUSFS_UPDATE_SUS_KSTAT 0x55571
 #define CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY 0x55572
@@ -95,11 +95,6 @@ struct st_external_dir {
 };
 
 struct st_susfs_hide_sus_mnts_for_all_procs {
-	bool                    enabled;
-	int                     err;
-};
-
-struct st_susfs_umount_for_zygote_iso_service {
 	bool                    enabled;
 	int                     err;
 };
@@ -250,14 +245,6 @@ static void print_help(void) {
 	log("           - It is set to 1 in kernel by default\n");
 	log("           - It is recommended to set to 0 after screen is unlocked, or during service.sh or boot-completed.sh stage, as this should fix the issue on some rooted apps that rely on mounts mounted by ksu process\n");
 	log("\n");
-	log("    umount_for_zygote_iso_service <0|1>\n");
-	log("      |--> 0 -> Do not umount for zygote spawned isolated service process\n");
-	log("      |--> 1 -> Enable to umount for zygote spawned isolated service process\n");
-	log("      |--> NOTE:\n");
-	log("           - By default it is set to 0 in kernel, or create '/data/adb/susfs_umount_for_zygote_iso_service' to set it to 1 on boot\n");
-	log("           - Set to 0 if you have modules that overlay framework system files like framework.jar or other overlay apk, then atm you should let other module like zygisk and its hiding module to take care of, otherwise it may cause bootloop\n");
-	log("           - Set to 1 if you DO NOT have such modules mentioned above, otherwise sus mounts won't be umounted for zygote spawned isolated process and they will be detected\n");
-	log("\n");
 	log("    add_sus_kstat_statically </path/of/file_or_directory> <ino> <dev> <nlink> <size> <atime> <atime_nsec> <mtime> <mtime_nsec> <ctime> <ctime_nsec> <blocks> <blksize>\n");
 	log("      |--> Use 'stat' tool to find the format:\n");
 	log("               ino -> %%i, dev -> %%d, nlink -> %%h, atime -> %%X, mtime -> %%Y, ctime -> %%Z\n");
@@ -389,19 +376,6 @@ int main(int argc, char *argv[]) {
 		info.err = ERR_CMD_NOT_SUPPORTED;
 		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS, &info);
 		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS);
-		return info.err;
-	// umount_for_zygote_iso_service
-	} else if (argc == 3 && !strcmp(argv[1], "umount_for_zygote_iso_service")) {
-		struct st_susfs_umount_for_zygote_iso_service info = {0};
-
-		if (strcmp(argv[2], "0") && strcmp(argv[2], "1")) {
-			print_help();
-			return -EINVAL;
-		}
-		info.enabled = atoi(argv[2]);
-		info.err = ERR_CMD_NOT_SUPPORTED;
-		syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE, &info);
-		PRT_MSG_IF_CMD_NOT_SUPPORTED(info.err, CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE);
 		return info.err;
 	// add_sus_kstat_statically
 	} else if (argc == 15 && !strcmp(argv[1], "add_sus_kstat_statically")) {
